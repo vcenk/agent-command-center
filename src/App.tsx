@@ -23,6 +23,7 @@ import KnowledgeForm from "./pages/dashboard/knowledge/KnowledgeForm";
 import KnowledgeDetail from "./pages/dashboard/knowledge/KnowledgeDetail";
 import CallsList from "./pages/dashboard/calls/CallsList";
 import CallDetail from "./pages/dashboard/calls/CallDetail";
+import ChannelsPage from "./pages/dashboard/channels/ChannelsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import AuditLogsPage from "./pages/dashboard/AuditLogsPage";
 
@@ -59,7 +60,7 @@ const App = () => (
               <Route path="knowledge" element={<KnowledgeList />} />
               <Route path="knowledge/new" element={<KnowledgeForm />} />
               <Route path="knowledge/:id" element={<KnowledgeDetail />} />
-              <Route path="channels" element={<ComingSoon title="Channels" />} />
+              <Route path="channels" element={<ChannelsPage />} />
               <Route path="calls" element={<CallsList />} />
               <Route path="calls/:id" element={<CallDetail />} />
               <Route path="integrations" element={<ComingSoon title="Integrations" />} />

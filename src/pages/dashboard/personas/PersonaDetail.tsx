@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { personas, auditLogs } from '@/lib/mockDb';
-import { Persona } from '@/types';
+import { usePersona, useUpdatePersona, useDeletePersona } from '@/hooks/usePersonas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -16,34 +16,65 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Save, X, Plus, MessageSquare, Bot, Trash2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Save, X, Plus, MessageSquare, Bot, Trash2, Loader2 } from 'lucide-react';
 
 const tones = ['professional', 'friendly', 'casual', 'formal'] as const;
 const fallbackPolicies = ['apologize', 'escalate', 'retry', 'transfer'] as const;
 
 const PersonaDetail: React.FC = () => {
   const { id } = useParams();
-  const { workspace, user, hasPermission } = useAuth();
+  const { workspace, hasPermission } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
 
-  const existingPersona = id ? personas.getById(id) : null;
+  const { data: persona, isLoading } = usePersona(id);
+  const updatePersona = useUpdatePersona();
+  const deletePersona = useDeletePersona();
 
   const [formData, setFormData] = useState({
-    name: existingPersona?.name || '',
-    roleTitle: existingPersona?.roleTitle || '',
-    tone: existingPersona?.tone || 'professional' as Persona['tone'],
-    styleNotes: existingPersona?.styleNotes || '',
-    doNotDo: existingPersona?.doNotDo || [] as string[],
-    greetingScript: existingPersona?.greetingScript || '',
-    fallbackPolicy: existingPersona?.fallbackPolicy || 'apologize' as Persona['fallbackPolicy'],
-    escalationRules: existingPersona?.escalationRules || '',
+    name: '',
+    role_title: '',
+    tone: 'professional' as typeof tones[number],
+    style_notes: '',
+    do_not_do: [] as string[],
+    greeting_script: '',
+    fallback_policy: 'apologize' as typeof fallbackPolicies[number],
+    escalation_rules: '',
   });
 
   const [newDoNotDo, setNewDoNotDo] = useState('');
 
-  if (!existingPersona) {
+  useEffect(() => {
+    if (persona) {
+      setFormData({
+        name: persona.name,
+        role_title: persona.role_title,
+        tone: persona.tone,
+        style_notes: persona.style_notes || '',
+        do_not_do: persona.do_not_do || [],
+        greeting_script: persona.greeting_script || '',
+        fallback_policy: persona.fallback_policy,
+        escalation_rules: persona.escalation_rules || '',
+      });
+    }
+  }, [persona]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-48" />
+            <Skeleton className="h-48" />
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!persona || !workspace) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh]">
         <h1 className="text-2xl font-bold text-foreground mb-2">Persona not found</h1>
@@ -58,44 +89,29 @@ const PersonaDetail: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workspace || !user || !canEdit) return;
+    if (!canEdit) return;
 
-    personas.update(existingPersona.id, formData);
-    auditLogs.create({
-      workspaceId: workspace.id,
-      actorEmail: user.email,
-      actionType: 'update',
-      entityType: 'persona',
-      entityId: existingPersona.id,
-      before: { id: existingPersona.id, name: existingPersona.name },
-      after: { id: existingPersona.id, name: formData.name },
-    });
-    toast({ title: 'Persona updated', description: `${formData.name} has been saved.` });
-    navigate('/dashboard/personas');
+    updatePersona.mutate(
+      { id: persona.id, ...formData },
+      {
+        onSuccess: () => navigate('/dashboard/personas'),
+      }
+    );
   };
 
   const handleDelete = () => {
-    if (!workspace || !user || !canEdit) return;
+    if (!canEdit) return;
 
-    auditLogs.create({
-      workspaceId: workspace.id,
-      actorEmail: user.email,
-      actionType: 'delete',
-      entityType: 'persona',
-      entityId: existingPersona.id,
-      before: { id: existingPersona.id, name: existingPersona.name },
-      after: null,
+    deletePersona.mutate(persona.id, {
+      onSuccess: () => navigate('/dashboard/personas'),
     });
-    personas.delete(existingPersona.id);
-    toast({ title: 'Persona deleted' });
-    navigate('/dashboard/personas');
   };
 
   const addDoNotDo = () => {
     if (newDoNotDo.trim()) {
       setFormData(prev => ({
         ...prev,
-        doNotDo: [...prev.doNotDo, newDoNotDo.trim()],
+        do_not_do: [...prev.do_not_do, newDoNotDo.trim()],
       }));
       setNewDoNotDo('');
     }
@@ -104,14 +120,14 @@ const PersonaDetail: React.FC = () => {
   const removeDoNotDo = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      doNotDo: prev.doNotDo.filter((_, i) => i !== index),
+      do_not_do: prev.do_not_do.filter((_, i) => i !== index),
     }));
   };
 
   const generateMockGreeting = () => {
     const name = formData.name || 'Assistant';
-    const role = formData.roleTitle || 'your assistant';
-    const toneGreetings: Record<Persona['tone'], string> = {
+    const role = formData.role_title || 'your assistant';
+    const toneGreetings: Record<typeof tones[number], string> = {
       professional: `Good day! This is ${name}, ${role}. How may I assist you today?`,
       friendly: `Hey there! I'm ${name}, ${role}. What can I help you with?`,
       casual: `Hi! ${name} here. What's up?`,
@@ -121,7 +137,7 @@ const PersonaDetail: React.FC = () => {
   };
 
   const generateMockResponse = () => {
-    const responses: Record<Persona['tone'], string> = {
+    const responses: Record<typeof tones[number], string> = {
       professional: "I understand your concern. Let me look into that for you right away. Based on our records, I can help you with that request.",
       friendly: "Oh, I totally get that! Let me check on that for you. Give me just a sec... Great news! I found what you need!",
       casual: "Got it! Let me see... Yep, I can help with that. Here's what you need to know.",
@@ -138,16 +154,25 @@ const PersonaDetail: React.FC = () => {
           Back to Personas
         </Button>
         {canEdit && (
-          <Button variant="destructive" size="sm" onClick={handleDelete}>
-            <Trash2 className="w-4 h-4 mr-2" />
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={handleDelete}
+            disabled={deletePersona.isPending}
+          >
+            {deletePersona.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4 mr-2" />
+            )}
             Delete
           </Button>
         )}
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold text-foreground">{existingPersona.name}</h1>
-        <p className="text-muted-foreground">{existingPersona.roleTitle}</p>
+        <h1 className="text-2xl font-bold text-foreground">{persona.name}</h1>
+        <p className="text-muted-foreground">{persona.role_title}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -172,11 +197,11 @@ const PersonaDetail: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="roleTitle">Role Title</Label>
+                  <Label htmlFor="role_title">Role Title</Label>
                   <Input
-                    id="roleTitle"
-                    value={formData.roleTitle}
-                    onChange={(e) => setFormData(prev => ({ ...prev, roleTitle: e.target.value }))}
+                    id="role_title"
+                    value={formData.role_title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, role_title: e.target.value }))}
                     placeholder="Dental Receptionist"
                     required
                     disabled={!canEdit}
@@ -196,7 +221,7 @@ const PersonaDetail: React.FC = () => {
                 <Label htmlFor="tone">Tone</Label>
                 <Select
                   value={formData.tone}
-                  onValueChange={(v) => setFormData(prev => ({ ...prev, tone: v as Persona['tone'] }))}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, tone: v as typeof tones[number] }))}
                   disabled={!canEdit}
                 >
                   <SelectTrigger>
@@ -210,11 +235,11 @@ const PersonaDetail: React.FC = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="styleNotes">Style Notes</Label>
+                <Label htmlFor="style_notes">Style Notes</Label>
                 <Textarea
-                  id="styleNotes"
-                  value={formData.styleNotes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, styleNotes: e.target.value }))}
+                  id="style_notes"
+                  value={formData.style_notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, style_notes: e.target.value }))}
                   placeholder="e.g., Always confirm appointment details, use patient's first name..."
                   rows={3}
                   disabled={!canEdit}
@@ -230,11 +255,11 @@ const PersonaDetail: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="greetingScript">Greeting Script</Label>
+                <Label htmlFor="greeting_script">Greeting Script</Label>
                 <Textarea
-                  id="greetingScript"
-                  value={formData.greetingScript}
-                  onChange={(e) => setFormData(prev => ({ ...prev, greetingScript: e.target.value }))}
+                  id="greeting_script"
+                  value={formData.greeting_script}
+                  onChange={(e) => setFormData(prev => ({ ...prev, greeting_script: e.target.value }))}
                   placeholder="Hello! Thank you for calling [Company]. This is [Name]. How may I help you today?"
                   rows={3}
                   disabled={!canEdit}
@@ -264,9 +289,9 @@ const PersonaDetail: React.FC = () => {
                     </Button>
                   </div>
                 )}
-                {formData.doNotDo.length > 0 && (
+                {formData.do_not_do.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.doNotDo.map((item, idx) => (
+                    {formData.do_not_do.map((item, idx) => (
                       <Badge key={idx} variant="secondary" className="gap-1 pr-1">
                         {item}
                         {canEdit && (
@@ -282,16 +307,16 @@ const PersonaDetail: React.FC = () => {
                     ))}
                   </div>
                 )}
-                {formData.doNotDo.length === 0 && (
+                {formData.do_not_do.length === 0 && (
                   <p className="text-sm text-muted-foreground">No restrictions defined</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="fallbackPolicy">Fallback Policy</Label>
+                <Label htmlFor="fallback_policy">Fallback Policy</Label>
                 <Select
-                  value={formData.fallbackPolicy}
-                  onValueChange={(v) => setFormData(prev => ({ ...prev, fallbackPolicy: v as Persona['fallbackPolicy'] }))}
+                  value={formData.fallback_policy}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, fallback_policy: v as typeof fallbackPolicies[number] }))}
                   disabled={!canEdit}
                 >
                   <SelectTrigger>
@@ -306,11 +331,11 @@ const PersonaDetail: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="escalationRules">Escalation Rules</Label>
+                <Label htmlFor="escalation_rules">Escalation Rules</Label>
                 <Textarea
-                  id="escalationRules"
-                  value={formData.escalationRules}
-                  onChange={(e) => setFormData(prev => ({ ...prev, escalationRules: e.target.value }))}
+                  id="escalation_rules"
+                  value={formData.escalation_rules}
+                  onChange={(e) => setFormData(prev => ({ ...prev, escalation_rules: e.target.value }))}
                   placeholder="e.g., Escalate to manager if customer mentions legal action..."
                   rows={3}
                   disabled={!canEdit}
@@ -324,8 +349,12 @@ const PersonaDetail: React.FC = () => {
               <Button type="button" variant="outline" onClick={() => navigate('/dashboard/personas')}>
                 Cancel
               </Button>
-              <Button type="submit" variant="glow">
-                <Save className="w-4 h-4 mr-2" />
+              <Button type="submit" variant="glow" disabled={updatePersona.isPending}>
+                {updatePersona.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
                 Save Changes
               </Button>
             </div>
@@ -350,7 +379,7 @@ const PersonaDetail: React.FC = () => {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-foreground mb-1">Greeting</p>
                     <p className="text-sm text-muted-foreground">
-                      {formData.greetingScript || generateMockGreeting()}
+                      {formData.greeting_script || generateMockGreeting()}
                     </p>
                   </div>
                 </div>
@@ -377,9 +406,9 @@ const PersonaDetail: React.FC = () => {
 
               <div className="text-xs text-muted-foreground space-y-1">
                 <p><strong>Tone:</strong> {formData.tone}</p>
-                <p><strong>Fallback:</strong> {formData.fallbackPolicy}</p>
-                {formData.doNotDo.length > 0 && (
-                  <p><strong>Restrictions:</strong> {formData.doNotDo.length} defined</p>
+                <p><strong>Fallback:</strong> {formData.fallback_policy}</p>
+                {formData.do_not_do.length > 0 && (
+                  <p><strong>Restrictions:</strong> {formData.do_not_do.length} defined</p>
                 )}
               </div>
             </CardContent>

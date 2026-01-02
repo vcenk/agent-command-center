@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { knowledgeSources, auditLogs, retrieveChunks } from '@/lib/mockDb';
-import { KnowledgeSource } from '@/types';
+import { useKnowledgeSource, useKnowledgeChunks, useUpdateKnowledgeSource, useDeleteKnowledgeSource } from '@/hooks/useKnowledgeSources';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   ArrowLeft, 
   FileText, 
@@ -18,39 +18,54 @@ import {
   X, 
   Search,
   Trash2,
-  Save
+  Save,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const KnowledgeDetail: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { workspace, user, hasPermission } = useAuth();
+  const { workspace, hasPermission } = useAuth();
 
-  const [source, setSource] = useState<KnowledgeSource | null>(null);
+  const { data: source, isLoading } = useKnowledgeSource(id);
+  const { data: chunks } = useKnowledgeChunks(id);
+  const updateKnowledgeSource = useUpdateKnowledgeSource();
+  const deleteKnowledgeSource = useDeleteKnowledgeSource();
+
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [rawText, setRawText] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [testQuery, setTestQuery] = useState('');
-  const [testResults, setTestResults] = useState<any[]>([]);
+  const [testResults, setTestResults] = useState<typeof chunks>([]);
 
   const canEdit = hasPermission('write');
 
   useEffect(() => {
-    if (id) {
-      const found = knowledgeSources.getById(id);
-      if (found) {
-        setSource(found);
-        setName(found.name);
-        setUrl(found.url || '');
-        setRawText(found.rawText);
-        setTags(found.tags);
-      }
+    if (source) {
+      setName(source.name);
+      setUrl(source.url || '');
+      setRawText(source.raw_text || '');
+      setTags(source.tags || []);
     }
-  }, [id]);
+  }, [source]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="w-10 h-10" />
+          <div>
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
 
   if (!workspace || !source) {
     return (
@@ -84,32 +99,13 @@ const KnowledgeDetail: React.FC = () => {
       return;
     }
 
-    setIsSaving(true);
-
-    const before = { ...source };
-    const updated = knowledgeSources.update(source.id, {
+    updateKnowledgeSource.mutate({
+      id: source.id,
       name: name.trim(),
       url: source.type === 'URL' ? url : undefined,
-      rawText: rawText.trim(),
+      raw_text: rawText.trim(),
       tags,
     });
-
-    if (updated) {
-      auditLogs.create({
-        workspaceId: workspace.id,
-        actorEmail: user?.email || '',
-        actionType: 'update',
-        entityType: 'knowledge',
-        entityId: source.id,
-        before: before as unknown as Record<string, unknown>,
-        after: updated as unknown as Record<string, unknown>,
-      });
-
-      setSource(updated);
-      toast.success('Knowledge source updated');
-    }
-    
-    setIsSaving(false);
   };
 
   const handleDelete = () => {
@@ -118,19 +114,9 @@ const KnowledgeDetail: React.FC = () => {
       return;
     }
 
-    auditLogs.create({
-      workspaceId: workspace.id,
-      actorEmail: user?.email || '',
-      actionType: 'delete',
-      entityType: 'knowledge',
-      entityId: source.id,
-      before: source as unknown as Record<string, unknown>,
-      after: null,
+    deleteKnowledgeSource.mutate(source.id, {
+      onSuccess: () => navigate('/dashboard/knowledge'),
     });
-
-    knowledgeSources.delete(source.id);
-    toast.success('Knowledge source deleted');
-    navigate('/dashboard/knowledge');
   };
 
   const handleTestRetrieval = () => {
@@ -139,10 +125,21 @@ const KnowledgeDetail: React.FC = () => {
       return;
     }
 
-    const results = retrieveChunks(testQuery, [source.id], 3);
-    setTestResults(results);
+    // Simple keyword matching for demo
+    const queryWords = testQuery.toLowerCase().split(/\s+/);
+    const matchingChunks = (chunks || [])
+      .map(chunk => {
+        const content = chunk.content.toLowerCase();
+        const score = queryWords.filter(word => content.includes(word)).length;
+        return { ...chunk, score };
+      })
+      .filter(chunk => chunk.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+
+    setTestResults(matchingChunks);
     
-    if (results.length === 0) {
+    if (matchingChunks.length === 0) {
       toast.info('No matching chunks found');
     }
   };
@@ -177,13 +174,22 @@ const KnowledgeDetail: React.FC = () => {
               </Badge>
             </div>
             <p className="text-muted-foreground">
-              {source.chunks.length} chunks · Created {new Date(source.createdAt).toLocaleDateString()}
+              {chunks?.length || 0} chunks · Created {new Date(source.created_at).toLocaleDateString()}
             </p>
           </div>
         </div>
         {canEdit && (
-          <Button variant="destructive" size="sm" onClick={handleDelete}>
-            <Trash2 className="w-4 h-4 mr-2" />
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={handleDelete}
+            disabled={deleteKnowledgeSource.isPending}
+          >
+            {deleteKnowledgeSource.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4 mr-2" />
+            )}
             Delete
           </Button>
         )}
@@ -192,7 +198,7 @@ const KnowledgeDetail: React.FC = () => {
       <Tabs defaultValue="content" className="space-y-6">
         <TabsList>
           <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="chunks">Chunks ({source.chunks.length})</TabsTrigger>
+          <TabsTrigger value="chunks">Chunks ({chunks?.length || 0})</TabsTrigger>
           <TabsTrigger value="retrieval">Test Retrieval</TabsTrigger>
         </TabsList>
 
@@ -227,10 +233,10 @@ const KnowledgeDetail: React.FC = () => {
                       />
                     </div>
                   )}
-                  {source.type === 'PDF' && source.fileName && (
+                  {source.type === 'PDF' && source.file_name && (
                     <div className="space-y-2">
                       <Label>Original File</Label>
-                      <p className="text-sm text-muted-foreground">{source.fileName}</p>
+                      <p className="text-sm text-muted-foreground">{source.file_name}</p>
                     </div>
                   )}
                 </CardContent>
@@ -262,9 +268,17 @@ const KnowledgeDetail: React.FC = () => {
                     <CardTitle>Actions</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Button onClick={handleSave} className="w-full" disabled={isSaving}>
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? 'Saving...' : 'Save Changes'}
+                    <Button 
+                      onClick={handleSave} 
+                      className="w-full" 
+                      disabled={updateKnowledgeSource.isPending}
+                    >
+                      {updateKnowledgeSource.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      {updateKnowledgeSource.isPending ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </CardContent>
                 </Card>
@@ -318,22 +332,22 @@ const KnowledgeDetail: React.FC = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Characters</span>
-                    <span className="text-foreground">{source.rawText.length.toLocaleString()}</span>
+                    <span className="text-foreground">{(source.raw_text || '').length.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Chunks</span>
-                    <span className="text-foreground">{source.chunks.length}</span>
+                    <span className="text-foreground">{chunks?.length || 0}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Created</span>
                     <span className="text-foreground">
-                      {new Date(source.createdAt).toLocaleDateString()}
+                      {new Date(source.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Updated</span>
                     <span className="text-foreground">
-                      {new Date(source.updatedAt).toLocaleDateString()}
+                      {new Date(source.updated_at).toLocaleDateString()}
                     </span>
                   </div>
                 </CardContent>
@@ -352,24 +366,31 @@ const KnowledgeDetail: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {source.chunks.map((chunk, i) => (
-                  <div
-                    key={chunk.id}
-                    className="p-4 rounded-lg bg-secondary/30 border border-border/50"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline">Chunk {i + 1}</Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {chunk.content.length} chars
-                      </span>
+              {!chunks || chunks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                  <p>No chunks available</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {chunks.map((chunk, i) => (
+                    <div
+                      key={chunk.id}
+                      className="p-4 rounded-lg bg-secondary/30 border border-border/50"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="outline">Chunk {i + 1}</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {chunk.content.length} chars
+                        </span>
+                      </div>
+                      <p className="text-sm text-foreground font-mono whitespace-pre-wrap">
+                        {chunk.content}
+                      </p>
                     </div>
-                    <p className="text-sm text-foreground font-mono whitespace-pre-wrap">
-                      {chunk.content}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -403,7 +424,7 @@ const KnowledgeDetail: React.FC = () => {
             </CardContent>
           </Card>
 
-          {testResults.length > 0 && (
+          {testResults && testResults.length > 0 && (
             <Card className="glass border-border/50">
               <CardHeader>
                 <CardTitle>Retrieved Chunks</CardTitle>
@@ -423,7 +444,7 @@ const KnowledgeDetail: React.FC = () => {
                           Match #{i + 1}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
-                          Chunk {chunk.index + 1}
+                          Chunk {chunk.chunk_index + 1}
                         </span>
                       </div>
                       <p className="text-sm text-foreground font-mono whitespace-pre-wrap">
@@ -436,7 +457,7 @@ const KnowledgeDetail: React.FC = () => {
             </Card>
           )}
 
-          {testQuery && testResults.length === 0 && (
+          {testQuery && (!testResults || testResults.length === 0) && (
             <Card className="glass border-border/50">
               <CardContent className="py-8 text-center">
                 <Search className="w-10 h-10 mx-auto text-muted-foreground mb-3" />

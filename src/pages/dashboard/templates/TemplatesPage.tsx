@@ -4,38 +4,33 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCreateAgent } from '@/hooks/useAgents';
 import { useCreatePersona } from '@/hooks/usePersonas';
 import { useCreateKnowledgeSource } from '@/hooks/useKnowledgeSources';
+import { useUpsertChannelConfig } from '@/hooks/useChannelConfigs';
 import { agentTemplates, replaceTemplateVariables, AgentTemplate } from '@/lib/templates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
-  MessageSquare,
-  Calendar,
   MessageCircle,
+  Calendar,
   Globe,
-  Phone,
-  Smartphone,
   Loader2,
-  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
+
+import { WizardProvider, useWizard, WizardData } from './wizard/WizardContext';
+import { WizardStepper } from './wizard/WizardStepper';
+import { StepBasics } from './wizard/StepBasics';
+import { StepPersona } from './wizard/StepPersona';
+import { StepKnowledge } from './wizard/StepKnowledge';
+import { StepChannels } from './wizard/StepChannels';
+import { StepReview } from './wizard/StepReview';
+import { WizardSuccess } from './wizard/WizardSuccess';
 
 const templateIcons: Record<string, React.ElementType> = {
   'website-assistant': Globe,
@@ -43,123 +38,129 @@ const templateIcons: Record<string, React.ElementType> = {
   'appointment-booking': Calendar,
 };
 
-const channelOptions = [
-  { value: 'webChat', label: 'Web Chat' },
-  { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'sms', label: 'SMS' },
-  { value: 'phone', label: 'Phone' },
-];
+interface WizardDialogContentProps {
+  onClose: () => void;
+}
 
-export const TemplatesPage: React.FC = () => {
+const WizardDialogContent: React.FC<WizardDialogContentProps> = ({ onClose }) => {
   const navigate = useNavigate();
   const { workspace, user } = useAuth();
   const { toast } = useToast();
-  
+  const { step, totalSteps, data, template, nextStep, prevStep, reset } = useWizard();
+
   const createPersona = useCreatePersona();
   const createKnowledgeSource = useCreateKnowledgeSource();
   const createAgent = useCreateAgent();
-  
-  const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    agentName: '',
-    personaName: '',
-    businessName: '',
-    primaryChannel: '',
-  });
-  const [isCreating, setIsCreating] = useState(false);
-  const [creationStep, setCreationStep] = useState<'idle' | 'persona' | 'knowledge' | 'agent' | 'done'>('idle');
+  const upsertChannelConfig = useUpsertChannelConfig();
 
-  const handleUseTemplate = (template: AgentTemplate) => {
-    setSelectedTemplate(template);
-    const defaultChannel = Object.entries(template.defaultAgent.channels)
-      .find(([_, enabled]) => enabled)?.[0] || 'webChat';
-    
-    setFormData({
-      agentName: template.name,
-      personaName: template.defaultPersona.name,
-      businessName: '',
-      primaryChannel: defaultChannel,
-    });
-    setCreationStep('idle');
-    setIsDialogOpen(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdAgent, setCreatedAgent] = useState<{ id: string; name: string } | null>(null);
+
+  const validateStep = (): boolean => {
+    if (step === 1) {
+      if (!data.businessName.trim() || !data.agentName.trim()) {
+        toast({
+          title: 'Missing Information',
+          description: 'Business name and agent name are required.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (validateStep()) {
+      nextStep();
+    }
   };
 
   const handleSubmit = async () => {
-    if (!selectedTemplate || !workspace || !user) return;
-    if (!formData.agentName.trim() || !formData.businessName.trim()) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please provide agent name and business name.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsCreating(true);
-    const vars = { businessName: formData.businessName };
+    if (!template || !workspace || !user) return;
+    
+    setIsSubmitting(true);
+    const vars = { businessName: data.businessName };
 
     try {
       // 1. Create Persona
-      setCreationStep('persona');
       const persona = await createPersona.mutateAsync({
-        name: formData.personaName || selectedTemplate.defaultPersona.name,
-        role_title: selectedTemplate.defaultPersona.roleTitle,
-        tone: selectedTemplate.defaultPersona.tone,
-        style_notes: replaceTemplateVariables(selectedTemplate.defaultPersona.styleNotes, vars),
-        do_not_do: selectedTemplate.defaultPersona.guardrails,
-        greeting_script: replaceTemplateVariables(selectedTemplate.defaultPersona.greetingScript, vars),
-        fallback_policy: selectedTemplate.defaultPersona.fallbackPolicy,
-        escalation_rules: replaceTemplateVariables(selectedTemplate.defaultPersona.escalationRules, vars),
+        name: data.personaName || template.defaultPersona.name,
+        role_title: data.roleTitle || template.defaultPersona.roleTitle,
+        tone: data.tone,
+        style_notes: replaceTemplateVariables(template.defaultPersona.styleNotes, vars),
+        do_not_do: data.guardrails.filter(g => g.trim()),
+        greeting_script: replaceTemplateVariables(data.greetingScript, vars),
+        fallback_policy: data.fallbackPolicy,
+        escalation_rules: replaceTemplateVariables(template.defaultPersona.escalationRules, vars),
       });
 
-      // 2. Create Knowledge Source with chunks
-      setCreationStep('knowledge');
-      const rawText = selectedTemplate.defaultKnowledgeBase.chunks
-        .map(chunk => replaceTemplateVariables(chunk, vars))
-        .join('\n\n---\n\n');
-      
+      // 2. Create Knowledge Source
+      let rawText = '';
+      if (data.kbMethod === 'paste') {
+        rawText = data.pastedText;
+      } else if (data.kbMethod === 'faq') {
+        rawText = data.faqItems
+          .filter(f => f.question && f.answer)
+          .map(f => `Q: ${f.question}\nA: ${f.answer}`)
+          .join('\n\n---\n\n');
+      } else {
+        // Use template defaults
+        rawText = template.defaultKnowledgeBase.chunks
+          .map(chunk => replaceTemplateVariables(chunk, vars))
+          .join('\n\n---\n\n');
+      }
+
       const knowledgeSource = await createKnowledgeSource.mutateAsync({
-        name: replaceTemplateVariables(selectedTemplate.defaultKnowledgeBase.name, vars),
+        name: replaceTemplateVariables(template.defaultKnowledgeBase.name, vars),
         type: 'TEXT',
         raw_text: rawText,
-        tags: [selectedTemplate.category.toLowerCase(), 'template'],
-        url: null,
+        tags: [template.category.toLowerCase(), 'template'],
+        url: data.websiteUrl || null,
         file_name: null,
       });
 
-      // 3. Create Agent in draft status
-      setCreationStep('agent');
+      // 3. Create Agent
       const channels = {
-        webChat: formData.primaryChannel === 'webChat',
-        phone: formData.primaryChannel === 'phone',
-        sms: formData.primaryChannel === 'sms',
-        whatsapp: formData.primaryChannel === 'whatsapp',
+        webChat: data.webChatEnabled,
+        phone: false,
+        sms: false,
+        whatsapp: false,
       };
 
       const agent = await createAgent.mutateAsync({
-        name: formData.agentName,
-        business_domain: selectedTemplate.defaultAgent.industry,
+        name: data.agentName,
+        business_domain: template.defaultAgent.industry,
         persona_id: persona.id,
         channels,
-        goals: replaceTemplateVariables(selectedTemplate.defaultAgent.goals, vars),
+        goals: replaceTemplateVariables(template.defaultAgent.goals, vars),
         allowed_actions: [],
         knowledge_source_ids: [knowledgeSource.id],
-        status: 'draft',
+        status: data.publishImmediately ? 'live' : 'draft',
       });
 
-      setCreationStep('done');
-      
-      // Short delay to show success state
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 4. Create channel config for web chat if enabled
+      if (data.webChatEnabled) {
+        await upsertChannelConfig.mutateAsync({
+          agent_id: agent.id,
+          channel: 'webChat',
+          greeting: replaceTemplateVariables(data.greetingScript, vars),
+          voicemail_fallback: false,
+          business_hours: '9:00 AM - 5:00 PM',
+          escalation_to_human: data.fallbackPolicy === 'escalate' || data.fallbackPolicy === 'transfer',
+          provider: null,
+          phone_number: null,
+        });
+      }
+
+      setCreatedAgent({ id: agent.id, name: agent.name });
 
       toast({
-        title: 'Draft Agent Created',
-        description: 'Review your agent configuration before publishing.',
+        title: data.publishImmediately ? 'Agent Published' : 'Draft Agent Created',
+        description: data.publishImmediately 
+          ? 'Your agent is now live.'
+          : 'Review your agent before publishing.',
       });
-
-      setIsDialogOpen(false);
-      navigate(`/dashboard/agents/${agent.id}/review`);
     } catch (error) {
       console.error('Template creation error:', error);
       toast({
@@ -167,20 +168,97 @@ export const TemplatesPage: React.FC = () => {
         description: 'Failed to create agent from template.',
         variant: 'destructive',
       });
-      setCreationStep('idle');
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
   };
 
-  const getStepStatus = (step: string) => {
-    const steps = ['persona', 'knowledge', 'agent', 'done'];
-    const currentIndex = steps.indexOf(creationStep);
-    const stepIndex = steps.indexOf(step);
-    
-    if (stepIndex < currentIndex || creationStep === 'done') return 'done';
-    if (stepIndex === currentIndex) return 'loading';
-    return 'pending';
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  // Show success screen after creation
+  if (createdAgent) {
+    return (
+      <WizardSuccess
+        agentId={createdAgent.id}
+        agentName={createdAgent.name}
+        isPublished={data.publishImmediately}
+        onClose={handleClose}
+      />
+    );
+  }
+
+  const renderStep = () => {
+    switch (step) {
+      case 1: return <StepBasics />;
+      case 2: return <StepPersona />;
+      case 3: return <StepKnowledge />;
+      case 4: return <StepChannels />;
+      case 5: return <StepReview />;
+      default: return null;
+    }
+  };
+
+  return (
+    <div className="flex flex-col max-h-[80vh]">
+      <WizardStepper />
+      
+      <div className="flex-1 overflow-y-auto p-6">
+        {renderStep()}
+      </div>
+
+      <div className="flex items-center justify-between p-4 border-t border-border">
+        <Button
+          variant="outline"
+          onClick={step === 1 ? handleClose : prevStep}
+          disabled={isSubmitting}
+        >
+          {step === 1 ? (
+            'Cancel'
+          ) : (
+            <>
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back
+            </>
+          )}
+        </Button>
+
+        {step < totalSteps ? (
+          <Button onClick={handleNext} disabled={isSubmitting}>
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        ) : (
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Agent'
+            )}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const TemplatesPage: React.FC = () => {
+  const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const handleUseTemplate = (template: AgentTemplate) => {
+    setSelectedTemplate(template);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setSelectedTemplate(null);
   };
 
   return (
@@ -229,102 +307,31 @@ export const TemplatesPage: React.FC = () => {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create from Template</DialogTitle>
-            <DialogDescription>
-              {selectedTemplate && (
-                <>Using <strong>{selectedTemplate.name}</strong></>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {isCreating ? (
-            <div className="py-6 space-y-4">
-              <p className="text-sm text-muted-foreground text-center mb-4">Creating your agent...</p>
-              {['persona', 'knowledge', 'agent'].map((step) => {
-                const status = getStepStatus(step);
-                return (
-                  <div key={step} className="flex items-center gap-3">
-                    {status === 'loading' && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                    {status === 'done' && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                    {status === 'pending' && <div className="h-4 w-4 rounded-full border-2 border-muted" />}
-                    <span className={status === 'pending' ? 'text-muted-foreground' : 'text-foreground'}>
-                      {step === 'persona' && 'Creating persona...'}
-                      {step === 'knowledge' && 'Setting up knowledge base...'}
-                      {step === 'agent' && 'Creating draft agent...'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="businessName">Business Name *</Label>
-                <Input
-                  id="businessName"
-                  value={formData.businessName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, businessName: e.target.value }))}
-                  placeholder="Acme Corp"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="agentName">Agent Name *</Label>
-                <Input
-                  id="agentName"
-                  value={formData.agentName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, agentName: e.target.value }))}
-                  placeholder="My Business Assistant"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="personaName">Persona Name</Label>
-                <Input
-                  id="personaName"
-                  value={formData.personaName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, personaName: e.target.value }))}
-                  placeholder={selectedTemplate?.defaultPersona.name}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="primaryChannel">Primary Channel</Label>
-                <Select
-                  value={formData.primaryChannel}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, primaryChannel: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select channel" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {channelOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+        <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden">
+          {selectedTemplate && (
+            <WizardProvider>
+              <WizardDialogWrapper
+                template={selectedTemplate}
+                onClose={handleCloseDialog}
+              />
+            </WizardProvider>
           )}
-
-          <DialogFooter>
-            {!isCreating && (
-              <>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmit} disabled={isCreating}>
-                  Create Draft Agent
-                </Button>
-              </>
-            )}
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
+};
+
+// Wrapper to initialize wizard with template
+const WizardDialogWrapper: React.FC<{
+  template: AgentTemplate;
+  onClose: () => void;
+}> = ({ template, onClose }) => {
+  const { setTemplate } = useWizard();
+  
+  React.useEffect(() => {
+    setTemplate(template);
+  }, [template, setTemplate]);
+
+  return <WizardDialogContent onClose={onClose} />;
 };

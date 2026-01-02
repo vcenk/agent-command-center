@@ -10,6 +10,7 @@ interface LogRequest {
   agentId: string;
   sessionId: string;
   messages: { role: string; content: string }[];
+  channel?: string;
 }
 
 serve(async (req) => {
@@ -18,7 +19,7 @@ serve(async (req) => {
   }
 
   try {
-    const { agentId, sessionId, messages } = (await req.json()) as LogRequest;
+    const { agentId, sessionId, messages, channel = 'web' } = (await req.json()) as LogRequest;
 
     if (!agentId || !sessionId || !messages) {
       return new Response(
@@ -47,6 +48,11 @@ serve(async (req) => {
       );
     }
 
+    // Extract last message from the messages array
+    const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+    const lastMessage = lastMsg?.content || null;
+    const lastMessageAt = new Date().toISOString();
+
     // Check if session already exists
     const { data: existingSession, error: sessionError } = await supabase
       .from("chat_sessions")
@@ -63,7 +69,12 @@ serve(async (req) => {
       // Update existing session
       const { error: updateError } = await supabase
         .from("chat_sessions")
-        .update({ messages })
+        .update({ 
+          messages,
+          last_message: lastMessage,
+          last_message_at: lastMessageAt,
+          updated_at: lastMessageAt,
+        })
         .eq("id", existingSession.id);
 
       if (updateError) {
@@ -81,6 +92,10 @@ serve(async (req) => {
           agent_id: agentId,
           session_id: sessionId,
           messages,
+          channel,
+          status: 'active',
+          last_message: lastMessage,
+          last_message_at: lastMessageAt,
         })
         .select()
         .single();

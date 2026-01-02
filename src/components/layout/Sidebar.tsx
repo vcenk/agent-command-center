@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Radio,
   LayoutTemplate,
+  Inbox,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { name: 'Personas', href: '/dashboard/personas', icon: Users },
   { name: 'Knowledge Base', href: '/dashboard/knowledge', icon: BookOpen },
   { name: 'Channels', href: '/dashboard/channels', icon: Radio },
+  { name: 'Sessions', href: '/dashboard/sessions', icon: Inbox },
   { name: 'Test Chat', href: '/dashboard/test-chat', icon: MessageSquare },
   { name: 'Calls', href: '/dashboard/calls', icon: Phone },
   { name: 'Integrations', href: '/dashboard/integrations', icon: Plug },

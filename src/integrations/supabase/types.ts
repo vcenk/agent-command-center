@@ -415,6 +415,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_has_workspace_access: {
+        Args: { _user_id: string; _workspace_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       agent_status: "draft" | "live"

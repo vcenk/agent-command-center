@@ -2,3 +2,6 @@ project_id = "ehvcrdooykxmcpcopuxz"
 
 [functions.chat]
 verify_jwt = false
+
+[functions.log-chat-session]
+verify_jwt = false

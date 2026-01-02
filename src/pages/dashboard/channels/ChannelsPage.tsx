@@ -155,7 +155,9 @@ const ChannelsPage: React.FC = () => {
 <script>
 (function() {
   const CHAT_API = '${supabaseUrl}/functions/v1/chat';
+  const LOG_API = '${supabaseUrl}/functions/v1/log-chat-session';
   const AGENT_ID = '${agentId}';
+  const SESSION_ID = 'sess_' + Math.random().toString(36).substr(2, 9);
   
   // Create chat widget container
   const container = document.createElement('div');
@@ -170,7 +172,7 @@ const ChannelsPage: React.FC = () => {
       #ac-chat-input-container { padding: 12px; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; }
       #ac-chat-input { flex: 1; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 8px; outline: none; }
       #ac-chat-send { padding: 10px 16px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; }
-      .ac-msg { margin-bottom: 12px; max-width: 80%; padding: 10px 14px; border-radius: 12px; }
+      .ac-msg { margin-bottom: 12px; max-width: 80%; padding: 10px 14px; border-radius: 12px; word-wrap: break-word; }
       .ac-msg-user { background: #6366f1; color: white; margin-left: auto; }
       .ac-msg-assistant { background: #f3f4f6; color: #1f2937; }
     </style>
@@ -197,6 +199,14 @@ const ChannelsPage: React.FC = () => {
   
   btn.onclick = () => { isOpen = !isOpen; win.style.display = isOpen ? 'flex' : 'none'; };
   
+  function logSession() {
+    fetch(LOG_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId: AGENT_ID, sessionId: SESSION_ID, messages })
+    }).catch(e => console.log('Log error:', e));
+  }
+  
   async function sendMessage() {
     const text = input.value.trim();
     if (!text) return;
@@ -209,7 +219,7 @@ const ChannelsPage: React.FC = () => {
       const resp = await fetch(CHAT_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId: AGENT_ID, messages })
+        body: JSON.stringify({ agentId: AGENT_ID, messages, sessionId: SESSION_ID })
       });
       
       if (!resp.ok) throw new Error('Failed to send');
@@ -237,6 +247,7 @@ const ChannelsPage: React.FC = () => {
       }
       
       messages.push({ role: 'assistant', content: assistantMsg });
+      logSession();
     } catch (e) { addMessage('assistant', 'Sorry, something went wrong.'); }
   }
   

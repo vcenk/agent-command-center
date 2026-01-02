@@ -24,6 +24,7 @@ import KnowledgeDetail from "./pages/dashboard/knowledge/KnowledgeDetail";
 import CallsList from "./pages/dashboard/calls/CallsList";
 import CallDetail from "./pages/dashboard/calls/CallDetail";
 import ChannelsPage from "./pages/dashboard/channels/ChannelsPage";
+import { TemplatesPage } from "./pages/dashboard/templates/TemplatesPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import AuditLogsPage from "./pages/dashboard/AuditLogsPage";
 
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/no-access" element={<NoAccess />} />
             <Route path="/dashboard" element={<RouteGuard requireAuth requireWorkspace><DashboardLayout /></RouteGuard>}>
               <Route index element={<Overview />} />
+              <Route path="templates" element={<TemplatesPage />} />
               <Route path="agents" element={<AgentsList />} />
               <Route path="agents/new" element={<AgentForm />} />
               <Route path="agents/:id" element={<AgentDetail />} />

@@ -16,6 +16,7 @@ import {
   ChevronRight,
   MessageSquare,
   Radio,
+  LayoutTemplate,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -28,6 +29,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Templates', href: '/dashboard/templates', icon: LayoutTemplate },
   { name: 'Agents', href: '/dashboard/agents', icon: Bot },
   { name: 'Personas', href: '/dashboard/personas', icon: Users },
   { name: 'Knowledge Base', href: '/dashboard/knowledge', icon: BookOpen },

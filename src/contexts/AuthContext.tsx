@@ -199,14 +199,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .update({ workspace_id: ws.id })
       .eq('id', user.id);
 
-    // Add user role for this workspace
-    await supabase
+    // Add user role for this workspace (use insert, handle conflict)
+    const { error: roleError } = await supabase
       .from('user_roles')
-      .upsert({
-        user_id: user.id,
-        workspace_id: ws.id,
-        role: role,
-      });
+      .upsert(
+        {
+          user_id: user.id,
+          workspace_id: ws.id,
+          role: role,
+        },
+        { onConflict: 'user_id,workspace_id' }
+      );
+
+    if (roleError) {
+      console.error('Failed to upsert user role:', roleError);
+    }
 
     setWorkspaceState(ws);
     setUserRole(role);
@@ -233,6 +240,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createWorkspace = async (name: string): Promise<Workspace> => {
     if (!user) throw new Error('User not authenticated');
     
+    // Create the workspace
     const { data, error } = await supabase
       .from('workspaces')
       .insert({ name, created_by: user.id })
@@ -243,7 +251,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw error;
     }
 
-    await setWorkspace(data, 'OWNER');
+    // Insert user role as OWNER - this is critical for RLS to work
+    const { error: roleError } = await supabase
+      .from('user_roles')
+      .insert({
+        user_id: user.id,
+        workspace_id: data.id,
+        role: 'OWNER',
+      });
+
+    if (roleError) {
+      console.error('Failed to create user role:', roleError);
+      // Still continue but log the error
+    }
+
+    // Update profile with workspace
+    await supabase
+      .from('profiles')
+      .update({ workspace_id: data.id })
+      .eq('id', user.id);
+
+    setWorkspaceState(data);
+    setUserRole('OWNER');
+    setProfile((prev) => prev ? { ...prev, workspace_id: data.id } : null);
+    
     return data;
   };
 

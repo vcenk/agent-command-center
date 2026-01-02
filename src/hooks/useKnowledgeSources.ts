@@ -10,8 +10,8 @@ export interface KnowledgeSourceRow {
   type: 'PDF' | 'URL' | 'TEXT';
   url: string | null;
   file_name: string | null;
-  raw_text: string;
-  tags: string[];
+  raw_text: string | null;
+  tags: string[] | null;
   created_at: string;
   updated_at: string;
 }

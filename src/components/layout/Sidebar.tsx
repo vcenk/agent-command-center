@@ -34,6 +34,7 @@ const navItems: NavItem[] = [
   { name: 'Personas', href: '/dashboard/personas', icon: Users },
   { name: 'Knowledge Base', href: '/dashboard/knowledge', icon: BookOpen },
   { name: 'Channels', href: '/dashboard/channels', icon: Radio },
+  { name: 'Test Chat', href: '/dashboard/test-chat', icon: MessageSquare },
   { name: 'Calls', href: '/dashboard/calls', icon: Phone },
   { name: 'Integrations', href: '/dashboard/integrations', icon: Plug },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },

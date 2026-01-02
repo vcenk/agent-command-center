@@ -27,6 +27,7 @@ import ChannelsPage from "./pages/dashboard/channels/ChannelsPage";
 import { TemplatesPage } from "./pages/dashboard/templates/TemplatesPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import AuditLogsPage from "./pages/dashboard/AuditLogsPage";
+import TestChatPage from "./pages/dashboard/TestChatPage";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="knowledge/new" element={<KnowledgeForm />} />
               <Route path="knowledge/:id" element={<KnowledgeDetail />} />
               <Route path="channels" element={<ChannelsPage />} />
+              <Route path="test-chat" element={<TestChatPage />} />
               <Route path="calls" element={<CallsList />} />
               <Route path="calls/:id" element={<CallDetail />} />
               <Route path="integrations" element={<ComingSoon title="Integrations" />} />

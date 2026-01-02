@@ -34,6 +34,7 @@ interface AuthContextType {
   createWorkspace: (name: string) => Promise<Workspace>;
   hasPermission: (action: 'read' | 'write' | 'admin' | 'billing') => boolean;
   refreshProfile: () => Promise<void>;
+  fetchUserWorkspaces: () => Promise<Array<{ workspace: Workspace; role: Role }>>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -87,6 +88,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return null;
     }
     return data?.role as Role || null;
+  };
+
+  const fetchUserWorkspaces = async (): Promise<Array<{ workspace: Workspace; role: Role }>> => {
+    if (!user) return [];
+
+    // Get all user_roles for this user
+    const { data: roles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role, workspace_id')
+      .eq('user_id', user.id);
+
+    if (rolesError || !roles || roles.length === 0) {
+      return [];
+    }
+
+    // Fetch workspace details for each role
+    const workspaceIds = roles.map(r => r.workspace_id);
+    const { data: workspaces, error: wsError } = await supabase
+      .from('workspaces')
+      .select('*')
+      .in('id', workspaceIds);
+
+    if (wsError || !workspaces) {
+      return [];
+    }
+
+    // Combine workspace and role data
+    return roles.map(r => {
+      const ws = workspaces.find(w => w.id === r.workspace_id);
+      return ws ? { workspace: ws, role: r.role as Role } : null;
+    }).filter(Boolean) as Array<{ workspace: Workspace; role: Role }>;
   };
 
   const refreshProfile = async () => {
@@ -311,6 +343,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         createWorkspace,
         hasPermission,
         refreshProfile,
+        fetchUserWorkspaces,
       }}
     >
       {children}

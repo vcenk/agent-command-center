@@ -127,106 +127,76 @@ export const seedDemoData = (workspaceId: string, userEmail: string) => {
     status: 'draft',
   });
 
-  // Create sample call sessions
-  const sampleTranscripts = [
+  // Create sample call sessions with realistic transcripts
+  const sampleCallData = [
     {
-      direction: 'Inbound' as const,
+      direction: 'inbound' as const,
       from: '+1 (555) 123-4567',
       to: '+1 (555) 888-9999',
       durationSec: 245,
       status: 'completed' as const,
-      transcript: `
-Agent: Thank you for calling Bright Smile Dental! This is Sarah, how may I help you today?
-
-Caller: Hi, I'd like to schedule a cleaning appointment.
-
-Agent: Of course! I'd be happy to help you schedule a cleaning. Are you an existing patient with us, or will this be your first visit?
-
-Caller: I'm a new patient.
-
-Agent: Wonderful, welcome! Let me find some available times for you. Do you prefer mornings or afternoons?
-
-Caller: Mornings work better for me.
-
-Agent: Perfect. I have availability next Tuesday at 9:00 AM or Thursday at 10:30 AM. Which works better for you?
-
-Caller: Tuesday at 9 sounds good.
-
-Agent: Excellent! I've scheduled you for Tuesday, January 14th at 9:00 AM for a new patient cleaning appointment. Please arrive 15 minutes early to complete your paperwork, and don't forget to bring your ID and insurance card. Is there anything else I can help you with?
-
-Caller: No, that's all. Thank you!
-
-Agent: You're welcome! We look forward to seeing you Tuesday. Have a great day!
-      `,
+      transcript: [
+        { speaker: 'agent' as const, text: "Good morning! Thank you for calling Bright Smile Dental. This is Sarah, how may I assist you today?", timestamp: '00:00' },
+        { speaker: 'user' as const, text: "Hi, I'd like to schedule a cleaning appointment.", timestamp: '00:08' },
+        { speaker: 'agent' as const, text: "Of course! I'd be happy to help you with that. Are you a new patient or an existing patient with us?", timestamp: '00:15' },
+        { speaker: 'user' as const, text: "I'm a new patient.", timestamp: '00:22' },
+        { speaker: 'agent' as const, text: "Perfect. I have availability next Tuesday at 9:00 AM or Thursday at 10:30 AM. Which works better for you?", timestamp: '00:28' },
+        { speaker: 'user' as const, text: "Tuesday at 9 sounds good.", timestamp: '00:38' },
+        { speaker: 'agent' as const, text: "Excellent! I've scheduled you for Tuesday, January 14th at 9:00 AM for a new patient cleaning. Please arrive 15 minutes early. Is there anything else I can help with?", timestamp: '00:45' },
+        { speaker: 'user' as const, text: "No, that's all. Thank you!", timestamp: '01:02' },
+        { speaker: 'agent' as const, text: "You're welcome! We look forward to seeing you Tuesday. Have a great day!", timestamp: '01:08' },
+      ],
       summary: 'New patient scheduled for cleaning appointment on Tuesday at 9:00 AM. Caller was reminded to arrive early and bring ID and insurance card.',
-      outcomes: ['appointment_scheduled', 'new_patient'],
       escalation: 'none' as const,
     },
     {
-      direction: 'Inbound' as const,
+      direction: 'inbound' as const,
       from: '+1 (555) 234-5678',
       to: '+1 (555) 888-9999',
       durationSec: 180,
       status: 'completed' as const,
-      transcript: `
-Agent: Hello! Thank you for reaching out to Premium Properties. I'm Alex, how can I help you find your perfect home today?
-
-Caller: I'm looking for a 2-bedroom apartment downtown.
-
-Agent: Great choice! Downtown has some wonderful options. Do you have a budget in mind?
-
-Caller: Around $3,000 per month.
-
-Agent: Perfect. I have a lovely 2 bed, 2 bath at Skyline Apartments available immediately. It's 1,200 square feet with modern finishes and amazing city views. It's pet-friendly and listed at $2,800 per month. Would you like to schedule a viewing?
-
-Caller: That sounds great! Can I see it this weekend?
-
-Agent: Absolutely! I have Saturday at 2:00 PM or Sunday at 11:00 AM available. Which works better?
-
-Caller: Saturday at 2 works.
-
-Agent: Wonderful! I've scheduled your viewing at Skyline Apartments, Unit 2401, for Saturday at 2:00 PM. I'll send you a confirmation with the address and parking instructions. Is there anything else you'd like to know about the property?
-
-Caller: No, I think that covers it. Thanks!
-
-Agent: My pleasure! See you Saturday. Have a great day!
-      `,
+      transcript: [
+        { speaker: 'agent' as const, text: "Hello! Thank you for reaching out to Premium Properties. I'm Alex, how can I help you find your perfect home today?", timestamp: '00:00' },
+        { speaker: 'user' as const, text: "I'm looking for a 2-bedroom apartment downtown.", timestamp: '00:12' },
+        { speaker: 'agent' as const, text: "Great choice! Downtown has some wonderful options. Do you have a budget in mind?", timestamp: '00:20' },
+        { speaker: 'user' as const, text: "Around $3,000 per month.", timestamp: '00:28' },
+        { speaker: 'agent' as const, text: "Perfect. I have a lovely 2 bed, 2 bath at Skyline Apartments available immediately. It's 1,200 square feet with modern finishes and amazing city views. Listed at $2,800 per month. Would you like to schedule a viewing?", timestamp: '00:35' },
+        { speaker: 'user' as const, text: "That sounds great! Can I see it this weekend?", timestamp: '00:55' },
+        { speaker: 'agent' as const, text: "Absolutely! I have Saturday at 2:00 PM or Sunday at 11:00 AM available. Which works better?", timestamp: '01:02' },
+        { speaker: 'user' as const, text: "Saturday at 2 works.", timestamp: '01:12' },
+        { speaker: 'agent' as const, text: "Wonderful! I've scheduled your viewing for Saturday at 2:00 PM. I'll send you a confirmation with the address. Is there anything else?", timestamp: '01:18' },
+        { speaker: 'user' as const, text: "No, I think that covers it. Thanks!", timestamp: '01:35' },
+      ],
       summary: 'Prospective tenant scheduled viewing for Skyline Apartments 2BR unit on Saturday at 2:00 PM. Budget $3,000/month, interested in downtown area.',
-      outcomes: ['viewing_scheduled', 'qualified_lead'],
       escalation: 'none' as const,
     },
     {
-      direction: 'Inbound' as const,
+      direction: 'inbound' as const,
       from: '+1 (555) 345-6789',
       to: '+1 (555) 888-9999',
       durationSec: 320,
       status: 'transferred' as const,
-      transcript: `
-Agent: Thank you for calling Bright Smile Dental! This is Sarah, how may I help you today?
-
-Caller: I'm having severe tooth pain and I think it's an emergency.
-
-Agent: I'm so sorry to hear you're in pain. Let me help you right away. Can you describe the pain? Is it a sharp pain or more of a throbbing sensation?
-
-Caller: It's throbbing and it's been getting worse all day. I can barely eat.
-
-Agent: I understand, that sounds very uncomfortable. Given the severity, I want to make sure you get the best care possible. Let me transfer you to our office manager who can get you in for an emergency appointment right away. Please hold for just a moment.
-
-[Call transferred to office manager]
-      `,
+      transcript: [
+        { speaker: 'agent' as const, text: "Thank you for calling Bright Smile Dental! This is Sarah, how may I help you today?", timestamp: '00:00' },
+        { speaker: 'user' as const, text: "I'm having severe tooth pain and I think it's an emergency.", timestamp: '00:10' },
+        { speaker: 'agent' as const, text: "I'm so sorry to hear you're in pain. Let me help you right away. Can you describe the pain? Is it a sharp pain or more of a throbbing sensation?", timestamp: '00:18' },
+        { speaker: 'user' as const, text: "It's throbbing and it's been getting worse all day. I can barely eat.", timestamp: '00:32' },
+        { speaker: 'agent' as const, text: "I understand, that sounds very uncomfortable. Given the severity, let me transfer you to our office manager who can get you in for an emergency appointment right away. Please hold.", timestamp: '00:45' },
+      ],
       summary: 'Patient called with severe tooth pain emergency. Following escalation protocol, call was transferred to office manager for immediate emergency appointment scheduling.',
-      outcomes: ['emergency_call', 'escalated'],
       escalation: 'transferred' as const,
     },
   ];
 
-  sampleTranscripts.forEach((t, i) => {
+  sampleCallData.forEach((t, i) => {
+    const agentForCall = i < 2 ? (i === 0 ? agent1 : agent2) : agent1;
     callSessions.create({
       workspaceId,
-      agentId: i < 2 ? (i === 0 ? agent1.id : agent2.id) : agent1.id,
-      recordingUrl: `https://recordings.example.com/call-${generateId()}.mp3`,
+      agentId: agentForCall.id,
+      agentName: agentForCall.name,
       ...t,
       startTime: new Date(Date.now() - (i + 1) * 3600000 * 24).toISOString(),
+      createdAt: new Date(Date.now() - (i + 1) * 3600000 * 24).toISOString(),
     });
   });
 

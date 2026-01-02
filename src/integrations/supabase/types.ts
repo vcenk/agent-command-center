@@ -124,6 +124,63 @@ export type Database = {
           },
         ]
       }
+      chat_sessions: {
+        Row: {
+          agent_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          messages: Json
+          session_id: string
+          started_at: string
+          status: string
+          summary: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          messages?: Json
+          session_id: string
+          started_at?: string
+          status?: string
+          summary?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          messages?: Json
+          session_id?: string
+          started_at?: string
+          status?: string
+          summary?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_sessions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_chunks: {
         Row: {
           chunk_index: number

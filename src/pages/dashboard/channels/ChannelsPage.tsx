@@ -149,16 +149,108 @@ const ChannelsPage: React.FC = () => {
   }, [selectedAgentId, selectedAgent]);
 
   const generateEmbedSnippet = (agentId: string) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ehvcrdooykxmcpcopuxz.supabase.co';
     return `<!-- Agent Cockpit Chat Widget -->
 <script>
-  (function(w,d,s,o,f,js,fjs){
-    w['AgentCockpit']=o;w[o]=w[o]||function(){
-    (w[o].q=w[o].q||[]).push(arguments)};
-    js=d.createElement(s),fjs=d.getElementsByTagName(s)[0];
-    js.id=o;js.src=f;js.async=1;
-    fjs.parentNode.insertBefore(js,fjs);
-  })(window,document,'script','ac','https://cdn.agentcockpit.ai/widget.js');
-  ac('init', { agentId: '${agentId}' });
+(function() {
+  const CHAT_API = '${supabaseUrl}/functions/v1/chat';
+  const AGENT_ID = '${agentId}';
+  
+  // Create chat widget container
+  const container = document.createElement('div');
+  container.id = 'agent-cockpit-widget';
+  container.innerHTML = \`
+    <style>
+      #ac-chat-btn { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: #6366f1; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+      #ac-chat-btn svg { width: 28px; height: 28px; fill: white; }
+      #ac-chat-window { position: fixed; bottom: 90px; right: 20px; width: 380px; height: 500px; background: white; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12); z-index: 9999; display: none; flex-direction: column; overflow: hidden; }
+      #ac-chat-header { padding: 16px; background: #6366f1; color: white; font-weight: 600; }
+      #ac-chat-messages { flex: 1; padding: 16px; overflow-y: auto; }
+      #ac-chat-input-container { padding: 12px; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; }
+      #ac-chat-input { flex: 1; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 8px; outline: none; }
+      #ac-chat-send { padding: 10px 16px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; }
+      .ac-msg { margin-bottom: 12px; max-width: 80%; padding: 10px 14px; border-radius: 12px; }
+      .ac-msg-user { background: #6366f1; color: white; margin-left: auto; }
+      .ac-msg-assistant { background: #f3f4f6; color: #1f2937; }
+    </style>
+    <button id="ac-chat-btn"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></button>
+    <div id="ac-chat-window">
+      <div id="ac-chat-header">Chat with us</div>
+      <div id="ac-chat-messages"></div>
+      <div id="ac-chat-input-container">
+        <input id="ac-chat-input" placeholder="Type a message..." />
+        <button id="ac-chat-send">Send</button>
+      </div>
+    </div>
+  \`;
+  document.body.appendChild(container);
+  
+  const btn = document.getElementById('ac-chat-btn');
+  const win = document.getElementById('ac-chat-window');
+  const msgContainer = document.getElementById('ac-chat-messages');
+  const input = document.getElementById('ac-chat-input');
+  const sendBtn = document.getElementById('ac-chat-send');
+  
+  let messages = [];
+  let isOpen = false;
+  
+  btn.onclick = () => { isOpen = !isOpen; win.style.display = isOpen ? 'flex' : 'none'; };
+  
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    
+    messages.push({ role: 'user', content: text });
+    addMessage('user', text);
+    input.value = '';
+    
+    try {
+      const resp = await fetch(CHAT_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: AGENT_ID, messages })
+      });
+      
+      if (!resp.ok) throw new Error('Failed to send');
+      
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let assistantMsg = '';
+      let msgEl = addMessage('assistant', '');
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        for (const line of chunk.split('\\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) { assistantMsg += content; msgEl.textContent = assistantMsg; }
+          } catch {}
+        }
+      }
+      
+      messages.push({ role: 'assistant', content: assistantMsg });
+    } catch (e) { addMessage('assistant', 'Sorry, something went wrong.'); }
+  }
+  
+  function addMessage(role, text) {
+    const el = document.createElement('div');
+    el.className = 'ac-msg ac-msg-' + role;
+    el.textContent = text;
+    msgContainer.appendChild(el);
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+    return el;
+  }
+  
+  sendBtn.onclick = sendMessage;
+  input.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+})();
 </script>`;
   };
 

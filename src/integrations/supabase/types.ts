@@ -127,9 +127,13 @@ export type Database = {
       chat_sessions: {
         Row: {
           agent_id: string
+          channel: string | null
           created_at: string
           ended_at: string | null
           id: string
+          internal_note: string | null
+          last_message: string | null
+          last_message_at: string | null
           messages: Json
           session_id: string
           started_at: string
@@ -140,9 +144,13 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          channel?: string | null
           created_at?: string
           ended_at?: string | null
           id?: string
+          internal_note?: string | null
+          last_message?: string | null
+          last_message_at?: string | null
           messages?: Json
           session_id: string
           started_at?: string
@@ -153,9 +161,13 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          channel?: string | null
           created_at?: string
           ended_at?: string | null
           id?: string
+          internal_note?: string | null
+          last_message?: string | null
+          last_message_at?: string | null
           messages?: Json
           session_id?: string
           started_at?: string

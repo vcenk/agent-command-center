@@ -29,6 +29,8 @@ import { TemplatesPage } from "./pages/dashboard/templates/TemplatesPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import AuditLogsPage from "./pages/dashboard/AuditLogsPage";
 import TestChatPage from "./pages/dashboard/TestChatPage";
+import SessionsList from "./pages/dashboard/sessions/SessionsList";
+import SessionDetail from "./pages/dashboard/sessions/SessionDetail";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +70,8 @@ const App = () => (
               <Route path="knowledge/:id" element={<KnowledgeDetail />} />
               <Route path="channels" element={<ChannelsPage />} />
               <Route path="test-chat" element={<TestChatPage />} />
+              <Route path="sessions" element={<SessionsList />} />
+              <Route path="sessions/:id" element={<SessionDetail />} />
               <Route path="calls" element={<CallsList />} />
               <Route path="calls/:id" element={<CallDetail />} />
               <Route path="integrations" element={<ComingSoon title="Integrations" />} />

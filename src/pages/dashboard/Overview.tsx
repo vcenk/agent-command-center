@@ -1,23 +1,28 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { agents, personas, callSessions, knowledgeSources, usage as usageDb } from '@/lib/mockDb';
+import { useAgents } from '@/hooks/useAgents';
+import { usePersonas } from '@/hooks/usePersonas';
+import { useKnowledgeSources } from '@/hooks/useKnowledgeSources';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Users, Phone, Activity, TrendingUp, Clock, Zap } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Bot, Users, Phone, Activity, TrendingUp, Zap, BookOpen } from 'lucide-react';
 
 const Overview: React.FC = () => {
   const { workspace } = useAuth();
+  const { data: agents, isLoading: agentsLoading } = useAgents();
+  const { data: personas, isLoading: personasLoading } = usePersonas();
+  const { data: knowledgeSources, isLoading: knowledgeLoading } = useKnowledgeSources();
 
   if (!workspace) return null;
 
-  const workspaceAgents = agents.getByWorkspace(workspace.id);
-  const workspacePersonas = personas.getByWorkspace(workspace.id);
-  const workspaceCalls = callSessions.getByWorkspace(workspace.id);
-  const workspaceKnowledge = knowledgeSources.getByWorkspace(workspace.id);
-  const workspaceUsage = usageDb.get(workspace.id);
+  const isLoading = agentsLoading || personasLoading || knowledgeLoading;
+
+  const workspaceAgents = agents || [];
+  const workspacePersonas = personas || [];
+  const workspaceKnowledge = knowledgeSources || [];
 
   const liveAgents = workspaceAgents.filter(a => a.status === 'live').length;
-  const totalCallMinutes = workspaceCalls.reduce((acc, c) => acc + Math.ceil(c.durationSec / 60), 0);
 
   const stats = [
     {
@@ -37,24 +42,41 @@ const Overview: React.FC = () => {
       bgColor: 'bg-success/10',
     },
     {
-      name: 'Total Calls',
-      value: workspaceCalls.length,
-      change: `${totalCallMinutes} min`,
-      icon: Phone,
+      name: 'Knowledge Sources',
+      value: workspaceKnowledge.length,
+      change: 'Available',
+      icon: BookOpen,
       color: 'text-warning',
       bgColor: 'bg-warning/10',
     },
     {
-      name: 'Messages',
-      value: workspaceUsage.messages,
-      change: 'This period',
+      name: 'Channels',
+      value: workspaceAgents.reduce((acc, a) => {
+        const channels = a.channels as { webChat?: boolean; phone?: boolean; sms?: boolean; whatsapp?: boolean };
+        return acc + (channels.webChat ? 1 : 0) + (channels.phone ? 1 : 0) + (channels.sms ? 1 : 0) + (channels.whatsapp ? 1 : 0);
+      }, 0),
+      change: 'Enabled',
       icon: Activity,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
     },
   ];
 
-  const recentCalls = workspaceCalls.slice(0, 5);
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-32 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -88,60 +110,7 @@ const Overview: React.FC = () => {
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Calls */}
-        <Card className="glass border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Phone className="w-5 h-5 text-primary" />
-              Recent Calls
-            </CardTitle>
-            <CardDescription>Latest interactions handled by your agents</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentCalls.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Phone className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                <p>No calls yet</p>
-                <p className="text-sm">Calls will appear here once agents are active</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentCalls.map((call) => {
-                  const agent = agents.getById(call.agentId);
-                  return (
-                    <div
-                      key={call.id}
-                      className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
-                    >
-                      <div className={`p-2 rounded-md ${
-                        call.status === 'completed' ? 'bg-success/10' : 
-                        call.status === 'transferred' ? 'bg-warning/10' : 'bg-muted'
-                      }`}>
-                        <Phone className={`w-4 h-4 ${
-                          call.status === 'completed' ? 'text-success' : 
-                          call.status === 'transferred' ? 'text-warning' : 'text-muted-foreground'
-                        }`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {call.from}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {agent?.name || 'Unknown Agent'} · {Math.ceil(call.durationSec / 60)} min
-                        </p>
-                      </div>
-                      <Badge variant={call.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
-                        {call.status}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions / Status */}
+        {/* Agent Status */}
         <Card className="glass border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -160,13 +129,13 @@ const Overview: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 {workspaceAgents.slice(0, 5).map((agent) => {
-                  const persona = agent.personaId ? personas.getById(agent.personaId) : null;
+                  const persona = personas?.find(p => p.id === agent.persona_id);
                   return (
                     <div
                       key={agent.id}
                       className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
                     >
-                    <div className={`p-2 rounded-md ${
+                      <div className={`p-2 rounded-md ${
                         agent.status === 'live' ? 'bg-success/10' : 'bg-muted'
                       }`}>
                         <Bot className={`w-4 h-4 ${
@@ -178,7 +147,7 @@ const Overview: React.FC = () => {
                           {agent.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {persona?.name || 'No persona'} · {agent.businessDomain}
+                          {persona?.name || 'No persona'} · {agent.business_domain}
                         </p>
                       </div>
                       <Badge 
@@ -194,6 +163,50 @@ const Overview: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Personas */}
+        <Card className="glass border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
+              Personas
+            </CardTitle>
+            <CardDescription>Configured AI personalities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {workspacePersonas.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                <p>No personas configured</p>
+                <p className="text-sm">Create your first persona to get started</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {workspacePersonas.slice(0, 5).map((persona) => (
+                  <div
+                    key={persona.id}
+                    className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                  >
+                    <div className="p-2 rounded-md bg-primary/10">
+                      <Users className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {persona.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {persona.role_title} · {persona.tone}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="capitalize">
+                      {persona.tone}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Usage Widget */}
@@ -201,26 +214,26 @@ const Overview: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-primary" />
-            Usage This Period
+            Resources Summary
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div>
-              <p className="text-sm text-muted-foreground">Messages</p>
-              <p className="text-2xl font-semibold text-foreground">{workspaceUsage.messages}</p>
+              <p className="text-sm text-muted-foreground">Agents</p>
+              <p className="text-2xl font-semibold text-foreground">{workspaceAgents.length}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Call Minutes</p>
-              <p className="text-2xl font-semibold text-foreground">{workspaceUsage.callMinutes}</p>
+              <p className="text-sm text-muted-foreground">Personas</p>
+              <p className="text-2xl font-semibold text-foreground">{workspacePersonas.length}</p>
             </div>
             <div>
-          <p className="text-sm text-muted-foreground">Knowledge Sources</p>
+              <p className="text-sm text-muted-foreground">Knowledge Sources</p>
               <p className="text-2xl font-semibold text-foreground">{workspaceKnowledge.length}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Actions Executed</p>
-              <p className="text-2xl font-semibold text-foreground">{workspaceUsage.actionsExecuted}</p>
+              <p className="text-sm text-muted-foreground">Live Agents</p>
+              <p className="text-2xl font-semibold text-foreground">{liveAgents}</p>
             </div>
           </div>
         </CardContent>

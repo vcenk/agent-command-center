@@ -15,9 +15,9 @@ export interface AgentRow {
     sms: boolean;
     whatsapp: boolean;
   };
-  goals: string;
-  allowed_actions: string[];
-  knowledge_source_ids: string[];
+  goals: string | null;
+  allowed_actions: string[] | null;
+  knowledge_source_ids: string[] | null;
   status: 'draft' | 'live';
   created_at: string;
   updated_at: string;

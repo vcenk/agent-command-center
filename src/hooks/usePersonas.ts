@@ -9,11 +9,11 @@ export interface PersonaRow {
   name: string;
   role_title: string;
   tone: 'professional' | 'friendly' | 'casual' | 'formal';
-  style_notes: string;
-  do_not_do: string[];
-  greeting_script: string;
+  style_notes: string | null;
+  do_not_do: string[] | null;
+  greeting_script: string | null;
   fallback_policy: 'apologize' | 'escalate' | 'retry' | 'transfer';
-  escalation_rules: string;
+  escalation_rules: string | null;
   created_at: string;
   updated_at: string;
 }

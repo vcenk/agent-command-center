@@ -14,6 +14,248 @@ export type Database = {
   }
   public: {
     Tables: {
+      agents: {
+        Row: {
+          allowed_actions: string[] | null
+          business_domain: Database["public"]["Enums"]["business_domain"]
+          channels: Json
+          created_at: string
+          goals: string | null
+          id: string
+          knowledge_source_ids: string[] | null
+          name: string
+          persona_id: string | null
+          status: Database["public"]["Enums"]["agent_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          allowed_actions?: string[] | null
+          business_domain?: Database["public"]["Enums"]["business_domain"]
+          channels?: Json
+          created_at?: string
+          goals?: string | null
+          id?: string
+          knowledge_source_ids?: string[] | null
+          name: string
+          persona_id?: string | null
+          status?: Database["public"]["Enums"]["agent_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          allowed_actions?: string[] | null
+          business_domain?: Database["public"]["Enums"]["business_domain"]
+          channels?: Json
+          created_at?: string
+          goals?: string | null
+          id?: string
+          knowledge_source_ids?: string[] | null
+          name?: string
+          persona_id?: string | null
+          status?: Database["public"]["Enums"]["agent_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_configs: {
+        Row: {
+          agent_id: string
+          business_hours: string | null
+          channel: string
+          created_at: string
+          escalation_to_human: boolean | null
+          greeting: string | null
+          id: string
+          phone_number: string | null
+          provider: string | null
+          updated_at: string
+          voicemail_fallback: boolean | null
+        }
+        Insert: {
+          agent_id: string
+          business_hours?: string | null
+          channel: string
+          created_at?: string
+          escalation_to_human?: boolean | null
+          greeting?: string | null
+          id?: string
+          phone_number?: string | null
+          provider?: string | null
+          updated_at?: string
+          voicemail_fallback?: boolean | null
+        }
+        Update: {
+          agent_id?: string
+          business_hours?: string | null
+          channel?: string
+          created_at?: string
+          escalation_to_human?: boolean | null
+          greeting?: string | null
+          id?: string
+          phone_number?: string | null
+          provider?: string | null
+          updated_at?: string
+          voicemail_fallback?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_configs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          id: string
+          source_id: string
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string
+          id?: string
+          source_id: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          id?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_chunks_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_sources: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          id: string
+          name: string
+          raw_text: string | null
+          tags: string[] | null
+          type: Database["public"]["Enums"]["knowledge_type"]
+          updated_at: string
+          url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          name: string
+          raw_text?: string | null
+          tags?: string[] | null
+          type?: Database["public"]["Enums"]["knowledge_type"]
+          updated_at?: string
+          url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          name?: string
+          raw_text?: string | null
+          tags?: string[] | null
+          type?: Database["public"]["Enums"]["knowledge_type"]
+          updated_at?: string
+          url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_sources_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personas: {
+        Row: {
+          created_at: string
+          do_not_do: string[] | null
+          escalation_rules: string | null
+          fallback_policy: Database["public"]["Enums"]["fallback_policy"]
+          greeting_script: string | null
+          id: string
+          name: string
+          role_title: string
+          style_notes: string | null
+          tone: Database["public"]["Enums"]["persona_tone"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          do_not_do?: string[] | null
+          escalation_rules?: string | null
+          fallback_policy?: Database["public"]["Enums"]["fallback_policy"]
+          greeting_script?: string | null
+          id?: string
+          name: string
+          role_title: string
+          style_notes?: string | null
+          tone?: Database["public"]["Enums"]["persona_tone"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          do_not_do?: string[] | null
+          escalation_rules?: string | null
+          fallback_policy?: Database["public"]["Enums"]["fallback_policy"]
+          greeting_script?: string | null
+          id?: string
+          name?: string
+          role_title?: string
+          style_notes?: string | null
+          tone?: Database["public"]["Enums"]["persona_tone"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personas_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -118,7 +360,18 @@ export type Database = {
       }
     }
     Enums: {
+      agent_status: "draft" | "live"
       app_role: "OWNER" | "MANAGER" | "VIEWER"
+      business_domain:
+        | "healthcare"
+        | "retail"
+        | "finance"
+        | "realestate"
+        | "hospitality"
+        | "other"
+      fallback_policy: "apologize" | "escalate" | "retry" | "transfer"
+      knowledge_type: "PDF" | "URL" | "TEXT"
+      persona_tone: "professional" | "friendly" | "casual" | "formal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -246,7 +499,19 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agent_status: ["draft", "live"],
       app_role: ["OWNER", "MANAGER", "VIEWER"],
+      business_domain: [
+        "healthcare",
+        "retail",
+        "finance",
+        "realestate",
+        "hospitality",
+        "other",
+      ],
+      fallback_policy: ["apologize", "escalate", "retry", "transfer"],
+      knowledge_type: ["PDF", "URL", "TEXT"],
+      persona_tone: ["professional", "friendly", "casual", "formal"],
     },
   },
 } as const

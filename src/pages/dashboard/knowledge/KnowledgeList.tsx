@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { knowledgeSources, auditLogs } from '@/lib/mockDb';
+import { useKnowledgeSources, useDeleteKnowledgeSource, KnowledgeSourceRow } from '@/hooks/useKnowledgeSources';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   DropdownMenu, 
@@ -24,19 +25,19 @@ import {
   Trash2,
   Database
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 const KnowledgeList: React.FC = () => {
   const navigate = useNavigate();
-  const { workspace, user, hasPermission } = useAuth();
+  const { workspace, hasPermission } = useAuth();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
+  const { data: knowledgeSources = [], isLoading } = useKnowledgeSources();
+  const deleteKnowledge = useDeleteKnowledgeSource();
+
   if (!workspace) return null;
 
-  const allKnowledge = knowledgeSources.getByWorkspace(workspace.id);
-  
-  const filteredKnowledge = allKnowledge.filter(k => {
+  const filteredKnowledge = knowledgeSources.filter(k => {
     const matchesSearch = k.name.toLowerCase().includes(search.toLowerCase()) ||
                           k.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
     const matchesType = typeFilter === 'all' || k.type === typeFilter;
@@ -45,26 +46,9 @@ const KnowledgeList: React.FC = () => {
 
   const canEdit = hasPermission('write');
 
-  const handleDelete = (id: string, name: string) => {
-    if (!hasPermission('write')) {
-      toast.error('You do not have permission to delete knowledge sources');
-      return;
-    }
-
-    const source = knowledgeSources.getById(id);
-    knowledgeSources.delete(id);
-    
-    auditLogs.create({
-      workspaceId: workspace.id,
-      actorEmail: user?.email || '',
-      actionType: 'delete',
-      entityType: 'knowledge',
-      entityId: id,
-      before: source as unknown as Record<string, unknown>,
-      after: null,
-    });
-
-    toast.success(`Deleted "${name}"`);
+  const handleDelete = (source: KnowledgeSourceRow) => {
+    if (!canEdit) return;
+    deleteKnowledge.mutate(source.id);
   };
 
   const getTypeIcon = (type: string) => {
@@ -92,6 +76,29 @@ const KnowledgeList: React.FC = () => {
         return 'bg-muted text-muted-foreground';
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between">
+          <div>
+            <Skeleton className="h-8 w-40 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="flex gap-4">
+          <Skeleton className="h-10 flex-1 max-w-md" />
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="grid gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -171,7 +178,7 @@ const KnowledgeList: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <h3 className="font-medium text-foreground truncate">{source.name}</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {source.chunks.length} chunks · {source.rawText.length.toLocaleString()} chars
+                        {source.raw_text?.length?.toLocaleString() || 0} chars
                       </p>
                       {source.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
@@ -209,7 +216,7 @@ const KnowledgeList: React.FC = () => {
                           <DropdownMenuItem 
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDelete(source.id, source.name);
+                              handleDelete(source);
                             }}
                             className="text-destructive focus:text-destructive"
                           >

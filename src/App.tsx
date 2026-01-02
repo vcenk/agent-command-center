@@ -31,6 +31,7 @@ import AuditLogsPage from "./pages/dashboard/AuditLogsPage";
 import TestChatPage from "./pages/dashboard/TestChatPage";
 import SessionsList from "./pages/dashboard/sessions/SessionsList";
 import SessionDetail from "./pages/dashboard/sessions/SessionDetail";
+import LeadsPage from "./pages/dashboard/leads/LeadsPage";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,7 @@ const App = () => (
               <Route path="test-chat" element={<TestChatPage />} />
               <Route path="sessions" element={<SessionsList />} />
               <Route path="sessions/:id" element={<SessionDetail />} />
+              <Route path="leads" element={<LeadsPage />} />
               <Route path="calls" element={<CallsList />} />
               <Route path="calls/:id" element={<CallDetail />} />
               <Route path="integrations" element={<ComingSoon title="Integrations" />} />

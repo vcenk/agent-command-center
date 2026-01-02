@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useChatSession, useUpdateChatSession } from '@/hooks/useChatSessions';
+import { useLeadBySession } from '@/hooks/useLeads';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Bot, Clock, MessageSquare, ExternalLink, Save } from 'lucide-react';
+import { ArrowLeft, Bot, Clock, MessageSquare, ExternalLink, Save, Mail, Phone, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +14,7 @@ const SessionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: session, isLoading } = useChatSession(id);
+  const { data: lead } = useLeadBySession(session?.id);
   const updateSession = useUpdateChatSession();
   const [internalNote, setInternalNote] = useState('');
   const [noteLoaded, setNoteLoaded] = useState(false);
@@ -186,6 +188,46 @@ const SessionDetail: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Lead Info Card */}
+          {(session.lead_captured || lead) && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                    Lead Captured
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {lead?.name && (
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{lead.name}</span>
+                  </div>
+                )}
+                {lead?.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{lead.email}</span>
+                  </div>
+                )}
+                {lead?.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{lead.phone}</span>
+                  </div>
+                )}
+                <Link
+                  to={`/dashboard/leads?session=${session.id}`}
+                  className="text-xs text-primary hover:underline flex items-center gap-1 mt-2"
+                >
+                  View in Leads
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Internal Note */}
           <Card>

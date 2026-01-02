@@ -296,10 +296,11 @@ export const callSessions = {
     const q = query.toLowerCase();
     return db.callSessions.filter(c => 
       c.workspaceId === workspaceId &&
-      (c.transcript.toLowerCase().includes(q) || 
+      (c.transcript.some(t => t.text.toLowerCase().includes(q)) || 
        c.summary.toLowerCase().includes(q) ||
        c.from.toLowerCase().includes(q) ||
-       c.to.toLowerCase().includes(q))
+       c.to.toLowerCase().includes(q) ||
+       c.agentName.toLowerCase().includes(q))
     );
   },
 };
@@ -413,7 +414,8 @@ export const globalSearch = (workspaceId: string, query: string) => {
 
   // Search calls
   callSessions.getByWorkspace(workspaceId).forEach(c => {
-    if (c.transcript.toLowerCase().includes(q) || c.summary.toLowerCase().includes(q)) {
+    const transcriptText = c.transcript.map(t => t.text).join(' ').toLowerCase();
+    if (transcriptText.includes(q) || c.summary.toLowerCase().includes(q)) {
       results.push({ type: 'call', id: c.id, name: `Call from ${c.from}`, description: c.summary.slice(0, 50) });
     }
   });

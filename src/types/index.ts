@@ -76,22 +76,29 @@ export interface KnowledgeChunk {
   index: number;
 }
 
+// Transcript entry for call sessions
+export interface TranscriptEntry {
+  speaker: 'user' | 'agent';
+  text: string;
+  timestamp: string;
+}
+
 // Call Session
 export interface CallSession {
   id: string;
   workspaceId: string;
   agentId: string;
-  direction: 'Inbound' | 'Outbound';
+  agentName: string;
+  direction: 'inbound' | 'outbound';
   from: string;
   to: string;
   startTime: string;
   durationSec: number;
-  status: 'completed' | 'missed' | 'voicemail' | 'transferred';
-  recordingUrl: string;
-  transcript: string;
+  status: 'completed' | 'missed' | 'transferred';
+  transcript: TranscriptEntry[];
   summary: string;
-  outcomes: string[];
   escalation: 'none' | 'transferred' | 'notified';
+  createdAt: string;
 }
 
 // Integration

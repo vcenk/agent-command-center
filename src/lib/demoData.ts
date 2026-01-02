@@ -108,11 +108,11 @@ export const seedDemoData = (workspaceId: string, userEmail: string) => {
     name: 'Dental Office Agent',
     businessDomain: 'healthcare',
     personaId: persona1.id,
-    channelsEnabled: { webChat: true, phone: true, sms: true, whatsapp: false },
+    channels: { webChat: true, phone: true, sms: true, whatsapp: false },
     goals: 'Schedule appointments, answer FAQs about insurance and services, handle basic inquiries.',
     allowedActions: ['Book appointment (Calendly)', 'Send confirmation email'],
-    knowledgeBaseIds: [knowledge1.id],
-    status: 'Live',
+    knowledgeSourceIds: [knowledge1.id],
+    status: 'live',
   });
 
   const agent2 = agents.create({
@@ -120,11 +120,11 @@ export const seedDemoData = (workspaceId: string, userEmail: string) => {
     name: 'Property Inquiry Bot',
     businessDomain: 'realestate',
     personaId: persona2.id,
-    channelsEnabled: { webChat: true, phone: false, sms: true, whatsapp: true },
+    channels: { webChat: true, phone: false, sms: true, whatsapp: true },
     goals: 'Qualify leads, provide property information, schedule viewings.',
     allowedActions: ['Book appointment (Calendly)', 'Send webhook (POST)'],
-    knowledgeBaseIds: [knowledge2.id],
-    status: 'Draft',
+    knowledgeSourceIds: [knowledge2.id],
+    status: 'draft',
   });
 
   // Create sample call sessions

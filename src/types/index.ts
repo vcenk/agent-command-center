@@ -40,7 +40,7 @@ export interface Agent {
   name: string;
   businessDomain: 'healthcare' | 'retail' | 'finance' | 'realestate' | 'hospitality' | 'other';
   personaId: string | null;
-  channelsEnabled: {
+  channels: {
     webChat: boolean;
     phone: boolean;
     sms: boolean;
@@ -48,8 +48,8 @@ export interface Agent {
   };
   goals: string;
   allowedActions: string[];
-  knowledgeBaseIds: string[];
-  status: 'Draft' | 'Live';
+  knowledgeSourceIds: string[];
+  status: 'draft' | 'live';
   createdAt: string;
   updatedAt: string;
 }

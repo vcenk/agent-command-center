@@ -39,8 +39,8 @@ const AgentForm: React.FC = () => {
     personaId: existingAgent?.personaId || '',
     goals: existingAgent?.goals || '',
     allowedActions: existingAgent?.allowedActions || [] as string[],
-    knowledgeBaseIds: existingAgent?.knowledgeBaseIds || [] as string[],
-    channelsEnabled: existingAgent?.channelsEnabled || {
+    knowledgeSourceIds: existingAgent?.knowledgeSourceIds || [] as string[],
+    channels: existingAgent?.channels || {
       webChat: true,
       phone: false,
       sms: false,
@@ -68,7 +68,7 @@ const AgentForm: React.FC = () => {
       const newAgent = agents.create({
         ...formData,
         workspaceId: workspace.id,
-        status: 'Draft',
+        status: 'draft',
       });
       auditLogs.create({
         workspaceId: workspace.id,
@@ -97,9 +97,9 @@ const AgentForm: React.FC = () => {
   const toggleKnowledge = (id: string) => {
     setFormData(prev => ({
       ...prev,
-      knowledgeBaseIds: prev.knowledgeBaseIds.includes(id)
-        ? prev.knowledgeBaseIds.filter(k => k !== id)
-        : [...prev.knowledgeBaseIds, id],
+      knowledgeSourceIds: prev.knowledgeSourceIds.includes(id)
+        ? prev.knowledgeSourceIds.filter(k => k !== id)
+        : [...prev.knowledgeSourceIds, id],
     }));
   };
 
@@ -195,10 +195,10 @@ const AgentForm: React.FC = () => {
                 <div key={channel} className="flex items-center space-x-3">
                   <Checkbox
                     id={channel}
-                    checked={formData.channelsEnabled[channel]}
+                    checked={formData.channels[channel]}
                     onCheckedChange={(checked) => setFormData(prev => ({
                       ...prev,
-                      channelsEnabled: { ...prev.channelsEnabled, [channel]: !!checked }
+                      channels: { ...prev.channels, [channel]: !!checked }
                     }))}
                   />
                   <Label htmlFor={channel} className="capitalize cursor-pointer">
@@ -243,7 +243,7 @@ const AgentForm: React.FC = () => {
                   <div key={k.id} className="flex items-center space-x-3">
                     <Checkbox
                       id={k.id}
-                      checked={formData.knowledgeBaseIds.includes(k.id)}
+                      checked={formData.knowledgeSourceIds.includes(k.id)}
                       onCheckedChange={() => toggleKnowledge(k.id)}
                     />
                     <Label htmlFor={k.id} className="cursor-pointer">

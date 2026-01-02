@@ -39,7 +39,7 @@ const AgentDetail: React.FC = () => {
 
   const agent = id ? agents.getById(id) : null;
   const persona = agent?.personaId ? personas.getById(agent.personaId) : null;
-  const knowledge = agent ? agent.knowledgeBaseIds.map(kid => knowledgeSources.getById(kid)).filter(Boolean) : [];
+  const knowledge = agent ? agent.knowledgeSourceIds.map(kid => knowledgeSources.getById(kid)).filter(Boolean) : [];
   const agentCalls = agent ? callSessions.getByAgent(agent.id) : [];
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -61,15 +61,15 @@ const AgentDetail: React.FC = () => {
   const handlePublish = () => {
     if (!hasPermission('write')) return;
     
-    agents.update(agent.id, { status: 'Live' });
+    agents.update(agent.id, { status: 'live' });
     auditLogs.create({
       workspaceId: workspace.id,
       actorEmail: user?.email || '',
       actionType: 'publish',
       entityType: 'agent',
       entityId: agent.id,
-      before: { status: 'Draft' },
-      after: { status: 'Live' },
+      before: { status: 'draft' },
+      after: { status: 'live' },
     });
     toast({
       title: 'Agent published!',
@@ -90,8 +90,8 @@ const AgentDetail: React.FC = () => {
     await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
 
     // Get relevant chunks if agent has knowledge
-    const chunks = agent.knowledgeBaseIds.length > 0
-      ? retrieveChunks(chatInput, agent.knowledgeBaseIds, 2)
+    const chunks = agent.knowledgeSourceIds.length > 0
+      ? retrieveChunks(chatInput, agent.knowledgeSourceIds, 2)
       : [];
 
     let responseContent = '';
@@ -129,23 +129,23 @@ const AgentDetail: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/agents')}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div className={`p-3 rounded-lg ${agent.status === 'Live' ? 'bg-success/10' : 'bg-secondary'}`}>
-            <Bot className={`w-8 h-8 ${agent.status === 'Live' ? 'text-success' : 'text-muted-foreground'}`} />
+          <div className={`p-3 rounded-lg ${agent.status === 'live' ? 'bg-success/10' : 'bg-secondary'}`}>
+            <Bot className={`w-8 h-8 ${agent.status === 'live' ? 'text-success' : 'text-muted-foreground'}`} />
           </div>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-foreground">{agent.name}</h1>
               <Badge
-                variant={agent.status === 'Live' ? 'default' : 'secondary'}
-                className={agent.status === 'Live' ? 'bg-success text-success-foreground' : ''}
+                variant={agent.status === 'live' ? 'default' : 'secondary'}
+                className={agent.status === 'live' ? 'bg-success text-success-foreground' : ''}
               >
-                {agent.status}
+                {agent.status === 'live' ? 'Live' : 'Draft'}
               </Badge>
             </div>
             <p className="text-muted-foreground capitalize">{agent.businessDomain}</p>
           </div>
         </div>
-        {hasPermission('write') && agent.status === 'Draft' && (
+        {hasPermission('write') && agent.status === 'draft' && (
           <Button variant="glow" onClick={handlePublish}>
             <Rocket className="w-4 h-4 mr-2" />
             Publish Agent
@@ -224,19 +224,19 @@ const AgentDetail: React.FC = () => {
                   <div
                     key={channel.key}
                     className={`p-4 rounded-lg border ${
-                      agent.channelsEnabled[channel.key as keyof typeof agent.channelsEnabled]
+                      agent.channels[channel.key as keyof typeof agent.channels]
                         ? 'border-primary/50 bg-primary/5'
                         : 'border-border bg-muted/20'
                     }`}
                   >
                     <channel.icon className={`w-6 h-6 mb-2 ${
-                      agent.channelsEnabled[channel.key as keyof typeof agent.channelsEnabled]
+                      agent.channels[channel.key as keyof typeof agent.channels]
                         ? 'text-primary'
                         : 'text-muted-foreground'
                     }`} />
                     <p className="font-medium">{channel.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {agent.channelsEnabled[channel.key as keyof typeof agent.channelsEnabled] ? 'Enabled' : 'Disabled'}
+                      {agent.channels[channel.key as keyof typeof agent.channels] ? 'Enabled' : 'Disabled'}
                     </p>
                   </div>
                 ))}

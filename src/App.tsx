@@ -16,6 +16,8 @@ import AgentsList from "./pages/dashboard/agents/AgentsList";
 import AgentForm from "./pages/dashboard/agents/AgentForm";
 import AgentDetail from "./pages/dashboard/agents/AgentDetail";
 import PersonasList from "./pages/dashboard/personas/PersonasList";
+import PersonaForm from "./pages/dashboard/personas/PersonaForm";
+import PersonaDetail from "./pages/dashboard/personas/PersonaDetail";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import AuditLogsPage from "./pages/dashboard/AuditLogsPage";
 
@@ -46,8 +48,9 @@ const App = () => (
               <Route path="agents/:id" element={<AgentDetail />} />
               <Route path="agents/:id/edit" element={<AgentForm />} />
               <Route path="personas" element={<PersonasList />} />
-              <Route path="personas/new" element={<ComingSoon title="Create Persona" />} />
-              <Route path="personas/:id" element={<ComingSoon title="Persona Detail" />} />
+              <Route path="personas/new" element={<PersonaForm />} />
+              <Route path="personas/:id" element={<PersonaDetail />} />
+              <Route path="personas/:id/edit" element={<PersonaForm />} />
               <Route path="knowledge" element={<ComingSoon title="Knowledge Base" />} />
               <Route path="channels" element={<ComingSoon title="Channels" />} />
               <Route path="calls" element={<ComingSoon title="Calls" />} />

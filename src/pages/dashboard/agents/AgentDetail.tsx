@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { agents, personas, knowledgeSources, auditLogs, retrieveChunks, callSessions } from '@/lib/mockDb';
+import { useAgent, useUpdateAgent } from '@/hooks/useAgents';
+import { usePersona } from '@/hooks/usePersonas';
+import { useKnowledgeSources } from '@/hooks/useKnowledgeSources';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   ArrowLeft,
   Bot,
@@ -15,7 +18,6 @@ import {
   MessageSquare,
   Phone,
   Mail,
-  Settings,
   BookOpen,
   Zap,
   Send,
@@ -33,18 +35,38 @@ interface ChatMessage {
 
 const AgentDetail: React.FC = () => {
   const { id } = useParams();
-  const { workspace, user, hasPermission } = useAuth();
+  const { workspace, hasPermission } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const agent = id ? agents.getById(id) : null;
-  const persona = agent?.personaId ? personas.getById(agent.personaId) : null;
-  const knowledge = agent ? agent.knowledgeSourceIds.map(kid => knowledgeSources.getById(kid)).filter(Boolean) : [];
-  const agentCalls = agent ? callSessions.getByAgent(agent.id) : [];
+  const { data: agent, isLoading: agentLoading } = useAgent(id);
+  const { data: persona } = usePersona(agent?.persona_id || undefined);
+  const { data: allKnowledgeSources } = useKnowledgeSources();
+  const updateAgent = useUpdateAgent();
+
+  const knowledge = allKnowledgeSources?.filter(k => 
+    agent?.knowledge_source_ids?.includes(k.id)
+  ) || [];
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+
+  if (agentLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="w-10 h-10" />
+          <Skeleton className="w-14 h-14 rounded-lg" />
+          <div>
+            <Skeleton className="w-48 h-8 mb-2" />
+            <Skeleton className="w-24 h-4" />
+          </div>
+        </div>
+        <Skeleton className="w-full h-64" />
+      </div>
+    );
+  }
 
   if (!agent || !workspace) {
     return (
@@ -61,21 +83,17 @@ const AgentDetail: React.FC = () => {
   const handlePublish = () => {
     if (!hasPermission('write')) return;
     
-    agents.update(agent.id, { status: 'live' });
-    auditLogs.create({
-      workspaceId: workspace.id,
-      actorEmail: user?.email || '',
-      actionType: 'publish',
-      entityType: 'agent',
-      entityId: agent.id,
-      before: { status: 'draft' },
-      after: { status: 'live' },
-    });
-    toast({
-      title: 'Agent published!',
-      description: `${agent.name} is now live and ready to handle interactions.`,
-    });
-    navigate('/dashboard/agents');
+    updateAgent.mutate(
+      { id: agent.id, status: 'live' },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Agent published!',
+            description: `${agent.name} is now live and ready to handle interactions.`,
+          });
+        },
+      }
+    );
   };
 
   const handleSendMessage = async () => {
@@ -89,24 +107,22 @@ const AgentDetail: React.FC = () => {
     // Simulate AI response with RAG
     await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
 
-    // Get relevant chunks if agent has knowledge
-    const chunks = agent.knowledgeSourceIds.length > 0
-      ? retrieveChunks(chatInput, agent.knowledgeSourceIds, 2)
-      : [];
-
     let responseContent = '';
     const sources: { name: string; content: string }[] = [];
 
-    if (chunks.length > 0) {
-      // Build response from chunks
-      const chunkInfo = chunks.map(c => c.content).join('\n\n');
-      responseContent = `Based on the available information:\n\n${chunks[0].content.slice(0, 200)}...\n\nIs there anything specific you'd like to know more about?`;
-      chunks.forEach(c => {
-        sources.push({ name: c.sourceName, content: c.content.slice(0, 100) + '...' });
-      });
+    if (knowledge.length > 0) {
+      // Simple keyword match for demo
+      const matchingSource = knowledge.find(k => 
+        k.raw_text?.toLowerCase().includes(chatInput.toLowerCase().split(' ')[0])
+      );
+      if (matchingSource) {
+        responseContent = `Based on "${matchingSource.name}":\n\n${matchingSource.raw_text?.slice(0, 200)}...\n\nIs there anything specific you'd like to know more about?`;
+        sources.push({ name: matchingSource.name, content: matchingSource.raw_text?.slice(0, 100) + '...' || '' });
+      } else {
+        responseContent = "I have access to some knowledge sources, but I couldn't find specific information about that. Could you rephrase your question?";
+      }
     } else if (persona) {
-      // Use persona greeting/style
-      responseContent = persona.greetingScript || `Hello! I'm here to help. ${persona.styleNotes ? `I'll be ${persona.tone} and ${persona.styleNotes.slice(0, 50)}...` : 'How can I assist you today?'}`;
+      responseContent = persona.greeting_script || `Hello! I'm here to help. How can I assist you today?`;
     } else {
       responseContent = "I'm here to help! However, I don't have any specific knowledge sources configured yet. Please add some knowledge to my configuration for better responses.";
     }
@@ -142,12 +158,16 @@ const AgentDetail: React.FC = () => {
                 {agent.status === 'live' ? 'Live' : 'Draft'}
               </Badge>
             </div>
-            <p className="text-muted-foreground capitalize">{agent.businessDomain}</p>
+            <p className="text-muted-foreground capitalize">{agent.business_domain}</p>
           </div>
         </div>
         {hasPermission('write') && agent.status === 'draft' && (
-          <Button variant="glow" onClick={handlePublish}>
-            <Rocket className="w-4 h-4 mr-2" />
+          <Button variant="glow" onClick={handlePublish} disabled={updateAgent.isPending}>
+            {updateAgent.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Rocket className="w-4 h-4 mr-2" />
+            )}
             Publish Agent
           </Button>
         )}
@@ -180,7 +200,7 @@ const AgentDetail: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="font-medium">{new Date(agent.createdAt).toLocaleDateString()}</p>
+                  <p className="font-medium">{new Date(agent.created_at).toLocaleDateString()}</p>
                 </div>
               </CardContent>
             </Card>
@@ -192,15 +212,11 @@ const AgentDetail: React.FC = () => {
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Calls</p>
-                  <p className="text-2xl font-bold">{agentCalls.length}</p>
+                  <p className="text-2xl font-bold">0</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Duration</p>
-                  <p className="text-2xl font-bold">
-                    {agentCalls.length > 0 
-                      ? Math.round(agentCalls.reduce((a, c) => a + c.durationSec, 0) / agentCalls.length / 60)
-                      : 0} min
-                  </p>
+                  <p className="text-2xl font-bold">0 min</p>
                 </div>
               </CardContent>
             </Card>
@@ -220,26 +236,28 @@ const AgentDetail: React.FC = () => {
                   { key: 'phone', name: 'Phone', icon: Phone },
                   { key: 'sms', name: 'SMS', icon: Mail },
                   { key: 'whatsapp', name: 'WhatsApp', icon: MessageSquare },
-                ].map(channel => (
-                  <div
-                    key={channel.key}
-                    className={`p-4 rounded-lg border ${
-                      agent.channels[channel.key as keyof typeof agent.channels]
-                        ? 'border-primary/50 bg-primary/5'
-                        : 'border-border bg-muted/20'
-                    }`}
-                  >
-                    <channel.icon className={`w-6 h-6 mb-2 ${
-                      agent.channels[channel.key as keyof typeof agent.channels]
-                        ? 'text-primary'
-                        : 'text-muted-foreground'
-                    }`} />
-                    <p className="font-medium">{channel.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {agent.channels[channel.key as keyof typeof agent.channels] ? 'Enabled' : 'Disabled'}
-                    </p>
-                  </div>
-                ))}
+                ].map(channel => {
+                  const channels = agent.channels as { webChat?: boolean; phone?: boolean; sms?: boolean; whatsapp?: boolean };
+                  const isEnabled = channels[channel.key as keyof typeof channels] ?? false;
+                  return (
+                    <div
+                      key={channel.key}
+                      className={`p-4 rounded-lg border ${
+                        isEnabled
+                          ? 'border-primary/50 bg-primary/5'
+                          : 'border-border bg-muted/20'
+                      }`}
+                    >
+                      <channel.icon className={`w-6 h-6 mb-2 ${
+                        isEnabled ? 'text-primary' : 'text-muted-foreground'
+                      }`} />
+                      <p className="font-medium">{channel.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {isEnabled ? 'Enabled' : 'Disabled'}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -259,13 +277,13 @@ const AgentDetail: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {knowledge.map(k => k && (
+                  {knowledge.map(k => (
                     <div key={k.id} className="flex items-center gap-4 p-4 rounded-lg bg-secondary/30">
                       <FileText className="w-5 h-5 text-primary" />
                       <div className="flex-1">
                         <p className="font-medium">{k.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {k.type} · {k.chunks.length} chunks
+                          {k.type}
                         </p>
                       </div>
                       <Badge variant="outline">{k.type}</Badge>
@@ -284,14 +302,14 @@ const AgentDetail: React.FC = () => {
               <CardDescription>What this agent can do during conversations</CardDescription>
             </CardHeader>
             <CardContent>
-              {agent.allowedActions.length === 0 ? (
+              {(!agent.allowed_actions || agent.allowed_actions.length === 0) ? (
                 <div className="text-center py-8">
                   <Zap className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
                   <p className="text-muted-foreground">No actions configured</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {agent.allowedActions.map(action => (
+                  {agent.allowed_actions.map(action => (
                     <div key={action} className="flex items-center gap-4 p-4 rounded-lg bg-secondary/30">
                       <Zap className="w-5 h-5 text-primary" />
                       <p className="font-medium">{action}</p>

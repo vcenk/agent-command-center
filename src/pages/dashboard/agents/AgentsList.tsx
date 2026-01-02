@@ -65,9 +65,9 @@ const AgentsList: React.FC = () => {
 
   const getChannelIcons = (agent: Agent) => {
     const icons = [];
-    if (agent.channelsEnabled.webChat) icons.push(<MessageSquare key="web" className="w-3 h-3" />);
-    if (agent.channelsEnabled.phone) icons.push(<Phone key="phone" className="w-3 h-3" />);
-    if (agent.channelsEnabled.sms) icons.push(<Mail key="sms" className="w-3 h-3" />);
+    if (agent.channels.webChat) icons.push(<MessageSquare key="web" className="w-3 h-3" />);
+    if (agent.channels.phone) icons.push(<Phone key="phone" className="w-3 h-3" />);
+    if (agent.channels.sms) icons.push(<Mail key="sms" className="w-3 h-3" />);
     return icons;
   };
 
@@ -128,20 +128,20 @@ const AgentsList: React.FC = () => {
                 onClick={() => navigate(`/dashboard/agents/${agent.id}`)}
               >
                 <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start justify-between mb-4">
                     <div className={`p-3 rounded-lg ${
-                      agent.status === 'Live' ? 'bg-success/10' : 'bg-secondary'
+                      agent.status === 'live' ? 'bg-success/10' : 'bg-secondary'
                     }`}>
                       <Bot className={`w-6 h-6 ${
-                        agent.status === 'Live' ? 'text-success' : 'text-muted-foreground'
+                        agent.status === 'live' ? 'text-success' : 'text-muted-foreground'
                       }`} />
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge 
-                        variant={agent.status === 'Live' ? 'default' : 'secondary'}
-                        className={agent.status === 'Live' ? 'bg-success text-success-foreground' : ''}
+                        variant={agent.status === 'live' ? 'default' : 'secondary'}
+                        className={agent.status === 'live' ? 'bg-success text-success-foreground' : ''}
                       >
-                        {agent.status}
+                        {agent.status === 'live' ? 'Live' : 'Draft'}
                       </Badge>
                       {hasPermission('write') && (
                         <DropdownMenu>
@@ -192,7 +192,7 @@ const AgentsList: React.FC = () => {
                       {getChannelIcons(agent)}
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {agent.knowledgeBaseIds.length} knowledge sources
+                      {agent.knowledgeSourceIds.length} knowledge sources
                     </span>
                   </div>
                 </CardContent>

@@ -16,7 +16,7 @@ const Overview: React.FC = () => {
   const workspaceKnowledge = knowledgeSources.getByWorkspace(workspace.id);
   const workspaceUsage = usageDb.get(workspace.id);
 
-  const liveAgents = workspaceAgents.filter(a => a.status === 'Live').length;
+  const liveAgents = workspaceAgents.filter(a => a.status === 'live').length;
   const totalCallMinutes = workspaceCalls.reduce((acc, c) => acc + Math.ceil(c.durationSec / 60), 0);
 
   const stats = [
@@ -166,11 +166,11 @@ const Overview: React.FC = () => {
                       key={agent.id}
                       className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
                     >
-                      <div className={`p-2 rounded-md ${
-                        agent.status === 'Live' ? 'bg-success/10' : 'bg-muted'
+                    <div className={`p-2 rounded-md ${
+                        agent.status === 'live' ? 'bg-success/10' : 'bg-muted'
                       }`}>
                         <Bot className={`w-4 h-4 ${
-                          agent.status === 'Live' ? 'text-success' : 'text-muted-foreground'
+                          agent.status === 'live' ? 'text-success' : 'text-muted-foreground'
                         }`} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -182,10 +182,10 @@ const Overview: React.FC = () => {
                         </p>
                       </div>
                       <Badge 
-                        variant={agent.status === 'Live' ? 'default' : 'secondary'}
-                        className={agent.status === 'Live' ? 'bg-success text-success-foreground' : ''}
+                        variant={agent.status === 'live' ? 'default' : 'secondary'}
+                        className={agent.status === 'live' ? 'bg-success text-success-foreground' : ''}
                       >
-                        {agent.status}
+                        {agent.status === 'live' ? 'Live' : 'Draft'}
                       </Badge>
                     </div>
                   );

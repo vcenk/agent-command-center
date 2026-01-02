@@ -144,6 +144,7 @@ const SessionsList: React.FC = () => {
                   <TableHead>Agent</TableHead>
                   <TableHead>Channel</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Lead</TableHead>
                   <TableHead className="w-[300px]">Last Message</TableHead>
                   <TableHead>Updated</TableHead>
                 </TableRow>
@@ -160,6 +161,15 @@ const SessionsList: React.FC = () => {
                     </TableCell>
                     <TableCell>{getChannelBadge(session.channel)}</TableCell>
                     <TableCell>{getStatusBadge(session.status)}</TableCell>
+                    <TableCell>
+                      {session.lead_captured ? (
+                        <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                          Lead
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {truncateMessage(session.last_message)}
                     </TableCell>

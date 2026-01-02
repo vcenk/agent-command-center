@@ -134,6 +134,8 @@ export type Database = {
           internal_note: string | null
           last_message: string | null
           last_message_at: string | null
+          lead_captured: boolean | null
+          lead_id: string | null
           messages: Json
           session_id: string
           started_at: string
@@ -151,6 +153,8 @@ export type Database = {
           internal_note?: string | null
           last_message?: string | null
           last_message_at?: string | null
+          lead_captured?: boolean | null
+          lead_id?: string | null
           messages?: Json
           session_id: string
           started_at?: string
@@ -168,6 +172,8 @@ export type Database = {
           internal_note?: string | null
           last_message?: string | null
           last_message_at?: string | null
+          lead_captured?: boolean | null
+          lead_id?: string | null
           messages?: Json
           session_id?: string
           started_at?: string
@@ -182,6 +188,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_sessions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
           {
@@ -271,6 +284,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      leads: {
+        Row: {
+          agent_id: string
+          channel: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string | null
+          phone: string | null
+          session_id: string | null
+          source: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          agent_id: string
+          channel?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          session_id?: string | null
+          source?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          agent_id?: string
+          channel?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          session_id?: string | null
+          source?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
       }
       personas: {
         Row: {

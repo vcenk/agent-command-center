@@ -18,6 +18,7 @@ import {
   Radio,
   LayoutTemplate,
   Inbox,
+  UserCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { name: 'Knowledge Base', href: '/dashboard/knowledge', icon: BookOpen },
   { name: 'Channels', href: '/dashboard/channels', icon: Radio },
   { name: 'Sessions', href: '/dashboard/sessions', icon: Inbox },
+  { name: 'Leads', href: '/dashboard/leads', icon: UserCheck },
   { name: 'Test Chat', href: '/dashboard/test-chat', icon: MessageSquare },
   { name: 'Calls', href: '/dashboard/calls', icon: Phone },
   { name: 'Integrations', href: '/dashboard/integrations', icon: Plug },

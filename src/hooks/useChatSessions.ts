@@ -19,6 +19,8 @@ export interface ChatSession {
   ended_at: string | null;
   created_at: string;
   updated_at: string;
+  lead_captured: boolean | null;
+  lead_id: string | null;
 }
 
 export interface ChatSessionWithAgent extends ChatSession {

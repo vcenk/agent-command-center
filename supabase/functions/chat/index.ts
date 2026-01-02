@@ -17,6 +17,112 @@ interface ChatRequest {
   sessionId?: string;
 }
 
+// Email regex pattern
+const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+
+// Phone regex pattern - supports various formats
+const PHONE_REGEX = /(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}/g;
+
+// Extract contact info from text
+function extractContactInfo(text: string): { email: string | null; phone: string | null } {
+  const emailMatches = text.match(EMAIL_REGEX);
+  const phoneMatches = text.match(PHONE_REGEX);
+  
+  // Get first valid email
+  const email = emailMatches?.[0] || null;
+  
+  // Get first valid phone and normalize it
+  let phone: string | null = null;
+  if (phoneMatches?.[0]) {
+    // Remove all non-digit characters except leading +
+    const rawPhone = phoneMatches[0];
+    const digits = rawPhone.replace(/\D/g, '');
+    // Format as E.164 if US number
+    if (digits.length === 10) {
+      phone = `+1${digits}`;
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+      phone = `+${digits}`;
+    } else {
+      phone = rawPhone; // Store raw if can't normalize
+    }
+  }
+  
+  return { email, phone };
+}
+
+// Upsert lead - non-blocking
+async function upsertLead(
+  supabase: any,
+  workspaceId: string,
+  agentId: string,
+  sessionId: string,
+  email: string | null,
+  phone: string | null,
+  channel: string = 'web'
+): Promise<string | null> {
+  try {
+    // Check if lead already exists for this session
+    const { data: existingLead } = await supabase
+      .from('leads')
+      .select('id, email, phone')
+      .eq('session_id', sessionId)
+      .maybeSingle();
+
+    if (existingLead) {
+      // Merge - update only if we have new info
+      const updates: any = { updated_at: new Date().toISOString() };
+      if (email && !existingLead.email) updates.email = email;
+      if (phone && !existingLead.phone) updates.phone = phone;
+      
+      if (Object.keys(updates).length > 1) {
+        await supabase
+          .from('leads')
+          .update(updates)
+          .eq('id', existingLead.id);
+        console.log(`Lead updated: ${existingLead.id}`);
+      }
+      return existingLead.id;
+    } else {
+      // Create new lead
+      const { data: newLead, error } = await supabase
+        .from('leads')
+        .insert({
+          workspace_id: workspaceId,
+          agent_id: agentId,
+          session_id: sessionId,
+          email,
+          phone,
+          channel,
+          source: 'chat_autodetect',
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Error creating lead:', error);
+        return null;
+      }
+
+      console.log(`Lead created: ${newLead.id}`);
+      
+      // Update chat session with lead info
+      await supabase
+        .from('chat_sessions')
+        .update({
+          lead_captured: true,
+          lead_id: newLead.id,
+        })
+        .eq('session_id', sessionId)
+        .eq('agent_id', agentId);
+
+      return newLead.id;
+    }
+  } catch (err) {
+    console.error('Lead upsert error:', err);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -65,6 +171,22 @@ serve(async (req) => {
 
     if (agentError) {
       console.error("Error loading agent:", agentError);
+    }
+
+    // Extract contact info from user messages (non-blocking lead capture)
+    if (sessionId && agent?.workspace_id) {
+      const allUserText = messages
+        .filter(m => m.role === 'user')
+        .map(m => m.content)
+        .join(' ');
+      
+      const { email, phone } = extractContactInfo(allUserText);
+      
+      if (email || phone) {
+        console.log(`Contact info detected - Email: ${email}, Phone: ${phone}`);
+        // Fire and forget - don't await to keep response fast
+        upsertLead(supabase, agent.workspace_id, agentId, sessionId, email, phone, 'web');
+      }
     }
 
     // Load persona if agent has one
@@ -178,6 +300,13 @@ serve(async (req) => {
         systemPrompt += `\n\nEscalation rules: ${persona.escalation_rules}`;
       }
     }
+
+    // Add soft lead capture guidelines
+    systemPrompt += `\n\n## Lead Capture Guidelines:
+- If the user asks for a quote, appointment, pricing, availability, or follow-up, politely ask: "I can help with that. Would you like to leave an email or phone number so we can follow up?"
+- Never demand contact information; only ask once if the user declines or ignores the request.
+- Do not collect sensitive data beyond basic contact info (email, phone, name).
+- If the user provides their contact info naturally, acknowledge it briefly and continue helping them.`;
 
     // Add knowledge context
     if (knowledgeContext) {

@@ -7,7 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { RouteGuard } from "@/components/RouteGuard";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
-import Login from "./pages/Login";
+import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import NoAccess from "./pages/NoAccess";
 import NotFound from "./pages/NotFound";
@@ -45,7 +45,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<Auth />} />
+            <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/no-access" element={<NoAccess />} />
             <Route path="/dashboard" element={<RouteGuard requireAuth requireWorkspace><DashboardLayout /></RouteGuard>}>

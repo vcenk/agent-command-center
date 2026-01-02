@@ -1,132 +1,262 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Workspace, Role } from '@/types';
-import { users, workspaces } from '@/lib/mockDb';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { Role } from '@/types';
+
+interface Profile {
+  id: string;
+  email: string;
+  workspace_id: string | null;
+}
+
+interface UserRole {
+  role: Role;
+  workspace_id: string;
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  created_at: string;
+}
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
+  profile: Profile | null;
   workspace: Workspace | null;
+  userRole: Role | null;
   isAuthenticated: boolean;
-  login: (email: string) => User;
-  logout: () => void;
-  setWorkspace: (workspace: Workspace) => void;
-  switchWorkspace: (workspaceId: string) => void;
-  createWorkspace: (name: string) => Workspace;
+  isLoading: boolean;
+  logout: () => Promise<void>;
+  setWorkspace: (workspace: Workspace, role?: Role) => Promise<void>;
+  switchWorkspace: (workspaceId: string) => Promise<void>;
+  createWorkspace: (name: string) => Promise<Workspace>;
   hasPermission: (action: 'read' | 'write' | 'admin' | 'billing') => boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const SESSION_KEY = 'agent_cockpit_session';
-
-interface SessionData {
-  userId: string;
-  workspaceId: string | null;
-}
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [workspace, setWorkspaceState] = useState<Workspace | null>(null);
+  const [userRole, setUserRole] = useState<Role | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load session on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(SESSION_KEY);
-    if (stored) {
-      try {
-        const session: SessionData = JSON.parse(stored);
-        const storedUser = users.getById(session.userId);
-        if (storedUser) {
-          setUser(storedUser);
-          if (session.workspaceId) {
-            const storedWorkspace = workspaces.getById(session.workspaceId);
-            if (storedWorkspace) {
-              setWorkspaceState(storedWorkspace);
-            }
-          }
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching profile:', error);
+      return null;
+    }
+    return data;
+  };
+
+  const fetchWorkspace = async (workspaceId: string) => {
+    const { data, error } = await supabase
+      .from('workspaces')
+      .select('*')
+      .eq('id', workspaceId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching workspace:', error);
+      return null;
+    }
+    return data;
+  };
+
+  const fetchUserRole = async (userId: string, workspaceId: string): Promise<Role | null> => {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching user role:', error);
+      return null;
+    }
+    return data?.role as Role || null;
+  };
+
+  const refreshProfile = async () => {
+    if (!user) return;
+
+    const profileData = await fetchProfile(user.id);
+    if (profileData) {
+      setProfile(profileData);
+
+      if (profileData.workspace_id) {
+        const workspaceData = await fetchWorkspace(profileData.workspace_id);
+        if (workspaceData) {
+          setWorkspaceState(workspaceData);
+          const role = await fetchUserRole(user.id, workspaceData.id);
+          setUserRole(role);
         }
-      } catch (e) {
-        console.error('Failed to restore session:', e);
-        localStorage.removeItem(SESSION_KEY);
       }
     }
+  };
+
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        // Defer Supabase calls with setTimeout to avoid deadlock
+        if (session?.user) {
+          setTimeout(() => {
+            fetchProfile(session.user.id).then((profileData) => {
+              if (profileData) {
+                setProfile(profileData);
+
+                if (profileData.workspace_id) {
+                  fetchWorkspace(profileData.workspace_id).then((workspaceData) => {
+                    if (workspaceData) {
+                      setWorkspaceState(workspaceData);
+                      fetchUserRole(session.user.id, workspaceData.id).then((role) => {
+                        setUserRole(role);
+                      });
+                    }
+                  });
+                }
+              }
+              setIsLoading(false);
+            });
+          }, 0);
+        } else {
+          setProfile(null);
+          setWorkspaceState(null);
+          setUserRole(null);
+          setIsLoading(false);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        fetchProfile(session.user.id).then((profileData) => {
+          if (profileData) {
+            setProfile(profileData);
+
+            if (profileData.workspace_id) {
+              fetchWorkspace(profileData.workspace_id).then((workspaceData) => {
+                if (workspaceData) {
+                  setWorkspaceState(workspaceData);
+                  fetchUserRole(session.user.id, workspaceData.id).then((role) => {
+                    setUserRole(role);
+                    setIsLoading(false);
+                  });
+                } else {
+                  setIsLoading(false);
+                }
+              });
+            } else {
+              setIsLoading(false);
+            }
+          } else {
+            setIsLoading(false);
+          }
+        });
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Save session on changes
-  useEffect(() => {
-    if (user) {
-      const session: SessionData = {
-        userId: user.id,
-        workspaceId: workspace?.id || null,
-      };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    }
-  }, [user, workspace]);
-
-  const login = (email: string): User => {
-    let existingUser = users.getByEmail(email);
-    
-    if (!existingUser) {
-      existingUser = users.create({
-        email,
-        workspaceId: null,
-        role: 'OWNER',
-      });
-    }
-
-    setUser(existingUser);
-    
-    if (existingUser.workspaceId) {
-      const ws = workspaces.getById(existingUser.workspaceId);
-      if (ws) {
-        setWorkspaceState(ws);
-      }
-    }
-
-    return existingUser;
-  };
-
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
+    setProfile(null);
     setWorkspaceState(null);
-    localStorage.removeItem(SESSION_KEY);
+    setUserRole(null);
   };
 
-  const setWorkspace = (ws: Workspace) => {
+  const setWorkspace = async (ws: Workspace, role: Role = 'OWNER') => {
+    if (!user) return;
+
+    // Update profile with workspace
+    await supabase
+      .from('profiles')
+      .update({ workspace_id: ws.id })
+      .eq('id', user.id);
+
+    // Add user role for this workspace
+    await supabase
+      .from('user_roles')
+      .upsert({
+        user_id: user.id,
+        workspace_id: ws.id,
+        role: role,
+      });
+
     setWorkspaceState(ws);
-    if (user) {
-      users.update(user.id, { workspaceId: ws.id });
-      setUser({ ...user, workspaceId: ws.id });
+    setUserRole(role);
+    setProfile((prev) => prev ? { ...prev, workspace_id: ws.id } : null);
+  };
+
+  const switchWorkspace = async (workspaceId: string) => {
+    if (!user) return;
+
+    const workspaceData = await fetchWorkspace(workspaceId);
+    if (workspaceData) {
+      await supabase
+        .from('profiles')
+        .update({ workspace_id: workspaceId })
+        .eq('id', user.id);
+
+      const role = await fetchUserRole(user.id, workspaceId);
+      setWorkspaceState(workspaceData);
+      setUserRole(role);
+      setProfile((prev) => prev ? { ...prev, workspace_id: workspaceId } : null);
     }
   };
 
-  const switchWorkspace = (workspaceId: string) => {
-    const ws = workspaces.getById(workspaceId);
-    if (ws && user) {
-      setWorkspaceState(ws);
-      users.update(user.id, { workspaceId });
-      setUser({ ...user, workspaceId });
-    }
-  };
+  const createWorkspace = async (name: string): Promise<Workspace> => {
+    const { data, error } = await supabase
+      .from('workspaces')
+      .insert({ name })
+      .select()
+      .single();
 
-  const createWorkspace = (name: string): Workspace => {
-    const newWorkspace = workspaces.create({ name });
-    setWorkspace(newWorkspace);
-    return newWorkspace;
+    if (error) {
+      throw error;
+    }
+
+    await setWorkspace(data, 'OWNER');
+    return data;
   };
 
   const hasPermission = (action: 'read' | 'write' | 'admin' | 'billing'): boolean => {
-    if (!user) return false;
-    
-    const role = user.role;
-    
+    if (!user || !userRole) return false;
+
     switch (action) {
       case 'read':
         return true; // All roles can read
       case 'write':
-        return role === 'OWNER' || role === 'MANAGER';
+        return userRole === 'OWNER' || userRole === 'MANAGER';
       case 'admin':
-        return role === 'OWNER';
+        return userRole === 'OWNER';
       case 'billing':
-        return role === 'OWNER';
+        return userRole === 'OWNER';
       default:
         return false;
     }
@@ -136,14 +266,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         user,
+        session,
+        profile,
         workspace,
+        userRole,
         isAuthenticated: !!user,
-        login,
+        isLoading,
         logout,
         setWorkspace,
         switchWorkspace,
         createWorkspace,
         hasPermission,
+        refreshProfile,
       }}
     >
       {children}

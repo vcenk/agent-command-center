@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { globalSearch, workspaces } from '@/lib/mockDb';
+import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,67 +13,57 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import {
   Search,
   ChevronDown,
   LogOut,
   User,
   Building2,
-  Bot,
-  Users,
-  Phone,
 } from 'lucide-react';
 
+interface Workspace {
+  id: string;
+  name: string;
+}
+
 export const TopBar: React.FC = () => {
-  const { user, workspace, logout, switchWorkspace } = useAuth();
+  const { user, workspace, logout, switchWorkspace, userRole } = useAuth();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([]);
 
-  const allWorkspaces = workspaces.getAll();
-  const searchResults = workspace && searchQuery.length > 1
-    ? globalSearch(workspace.id, searchQuery)
-    : [];
+  // Fetch workspaces user has access to
+  useEffect(() => {
+    const fetchWorkspaces = async () => {
+      if (!user) return;
 
-  const handleSearchSelect = (result: { type: string; id: string }) => {
-    setSearchOpen(false);
-    setSearchQuery('');
-    switch (result.type) {
-      case 'agent':
-        navigate(`/dashboard/agents/${result.id}`);
-        break;
-      case 'persona':
-        navigate(`/dashboard/personas/${result.id}`);
-        break;
-      case 'call':
-        navigate(`/dashboard/calls/${result.id}`);
-        break;
-    }
-  };
+      const { data } = await supabase
+        .from('workspaces')
+        .select('id, name');
 
-  const getResultIcon = (type: string) => {
-    switch (type) {
-      case 'agent':
-        return <Bot className="w-4 h-4" />;
-      case 'persona':
-        return <Users className="w-4 h-4" />;
-      case 'call':
-        return <Phone className="w-4 h-4" />;
-      default:
-        return null;
-    }
+      if (data) {
+        setAllWorkspaces(data);
+      }
+    };
+
+    fetchWorkspaces();
+  }, [user]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   return (
@@ -127,28 +117,7 @@ export const TopBar: React.FC = () => {
           <PopoverContent className="w-[400px] p-0" align="center">
             <Command>
               <CommandList>
-                <CommandEmpty>No results found.</CommandEmpty>
-                {searchResults.length > 0 && (
-                  <CommandGroup heading="Results">
-                    {searchResults.map((result) => (
-                      <CommandItem
-                        key={`${result.type}-${result.id}`}
-                        onSelect={() => handleSearchSelect(result)}
-                        className="gap-3"
-                      >
-                        <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center">
-                          {getResultIcon(result.type)}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{result.name}</span>
-                          <span className="text-xs text-muted-foreground capitalize">
-                            {result.type} · {result.description}
-                          </span>
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                )}
+                <CommandEmpty>No results found. Search will be available after data migration.</CommandEmpty>
               </CommandList>
             </Command>
           </PopoverContent>
@@ -171,12 +140,12 @@ export const TopBar: React.FC = () => {
             <div className="flex flex-col">
               <span>{user?.email}</span>
               <span className="text-xs font-normal text-muted-foreground capitalize">
-                {user?.role.toLowerCase()}
+                {userRole?.toLowerCase() || 'User'}
               </span>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => { logout(); navigate('/login'); }}>
+          <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="w-4 h-4 mr-2" />
             Sign out
           </DropdownMenuItem>

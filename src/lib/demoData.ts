@@ -42,8 +42,8 @@ export const seedDemoData = (workspaceId: string, userEmail: string) => {
   const knowledge1 = knowledgeSources.create({
     workspaceId,
     name: 'Dental Office FAQ',
-    type: 'Text',
-    content: `
+    type: 'TEXT',
+    rawText: `
       Our office hours are Monday through Friday, 8:00 AM to 5:00 PM.
       We are closed on weekends and major holidays.
       
@@ -72,8 +72,8 @@ export const seedDemoData = (workspaceId: string, userEmail: string) => {
   const knowledge2 = knowledgeSources.create({
     workspaceId,
     name: 'Property Listings - Downtown',
-    type: 'Text',
-    content: `
+    type: 'TEXT',
+    rawText: `
       DOWNTOWN PROPERTIES AVAILABLE:
       
       1. Skyline Apartments - Unit 2401

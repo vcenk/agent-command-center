@@ -198,13 +198,16 @@ export const knowledgeSources = {
   getAll: () => db.knowledgeSources,
   getById: (id: string) => db.knowledgeSources.find(k => k.id === id),
   getByWorkspace: (workspaceId: string) => db.knowledgeSources.filter(k => k.workspaceId === workspaceId),
-  create: (source: Omit<KnowledgeSource, 'id' | 'createdAt' | 'chunks'>) => {
-    const chunks = chunkContent(source.content, generateId());
+  create: (source: Omit<KnowledgeSource, 'id' | 'createdAt' | 'updatedAt' | 'chunks'>) => {
+    const id = generateId();
+    const chunks = chunkContent(source.rawText, id);
+    const now = new Date().toISOString();
     const newSource: KnowledgeSource = {
       ...source,
-      id: generateId(),
+      id,
       chunks,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
     db.knowledgeSources.push(newSource);
     saveDb(db);
@@ -213,10 +216,14 @@ export const knowledgeSources = {
   update: (id: string, data: Partial<KnowledgeSource>) => {
     const index = db.knowledgeSources.findIndex(k => k.id === id);
     if (index !== -1) {
-      if (data.content) {
-        data.chunks = chunkContent(data.content, id);
+      if (data.rawText) {
+        data.chunks = chunkContent(data.rawText, id);
       }
-      db.knowledgeSources[index] = { ...db.knowledgeSources[index], ...data };
+      db.knowledgeSources[index] = { 
+        ...db.knowledgeSources[index], 
+        ...data,
+        updatedAt: new Date().toISOString()
+      };
       saveDb(db);
       return db.knowledgeSources[index];
     }

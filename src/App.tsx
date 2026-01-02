@@ -18,6 +18,9 @@ import AgentDetail from "./pages/dashboard/agents/AgentDetail";
 import PersonasList from "./pages/dashboard/personas/PersonasList";
 import PersonaForm from "./pages/dashboard/personas/PersonaForm";
 import PersonaDetail from "./pages/dashboard/personas/PersonaDetail";
+import KnowledgeList from "./pages/dashboard/knowledge/KnowledgeList";
+import KnowledgeForm from "./pages/dashboard/knowledge/KnowledgeForm";
+import KnowledgeDetail from "./pages/dashboard/knowledge/KnowledgeDetail";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 import AuditLogsPage from "./pages/dashboard/AuditLogsPage";
 
@@ -51,7 +54,9 @@ const App = () => (
               <Route path="personas/new" element={<PersonaForm />} />
               <Route path="personas/:id" element={<PersonaDetail />} />
               <Route path="personas/:id/edit" element={<PersonaForm />} />
-              <Route path="knowledge" element={<ComingSoon title="Knowledge Base" />} />
+              <Route path="knowledge" element={<KnowledgeList />} />
+              <Route path="knowledge/new" element={<KnowledgeForm />} />
+              <Route path="knowledge/:id" element={<KnowledgeDetail />} />
               <Route path="channels" element={<ComingSoon title="Channels" />} />
               <Route path="calls" element={<ComingSoon title="Calls" />} />
               <Route path="integrations" element={<ComingSoon title="Integrations" />} />

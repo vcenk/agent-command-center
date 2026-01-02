@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { agents, personas, callSessions, usage as usageDb } from '@/lib/mockDb';
+import { agents, personas, callSessions, knowledgeSources, usage as usageDb } from '@/lib/mockDb';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Bot, Users, Phone, Activity, TrendingUp, Clock, Zap } from 'lucide-react';
@@ -13,6 +13,7 @@ const Overview: React.FC = () => {
   const workspaceAgents = agents.getByWorkspace(workspace.id);
   const workspacePersonas = personas.getByWorkspace(workspace.id);
   const workspaceCalls = callSessions.getByWorkspace(workspace.id);
+  const workspaceKnowledge = knowledgeSources.getByWorkspace(workspace.id);
   const workspaceUsage = usageDb.get(workspace.id);
 
   const liveAgents = workspaceAgents.filter(a => a.status === 'Live').length;
@@ -214,8 +215,8 @@ const Overview: React.FC = () => {
               <p className="text-2xl font-semibold text-foreground">{workspaceUsage.callMinutes}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Knowledge Uploads</p>
-              <p className="text-2xl font-semibold text-foreground">{workspaceUsage.knowledgeUploads}</p>
+          <p className="text-sm text-muted-foreground">Knowledge Sources</p>
+              <p className="text-2xl font-semibold text-foreground">{workspaceKnowledge.length}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Actions Executed</p>

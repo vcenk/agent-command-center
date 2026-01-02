@@ -66,11 +66,24 @@ export const useChatSession = (id: string | undefined) => {
   return useQuery({
     queryKey: ['chat-session', id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First try to find by id (primary key), then by session_id
+      let { data, error } = await supabase
         .from('chat_sessions')
         .select('*, agents(id, name)')
         .eq('id', id)
         .maybeSingle();
+      
+      // If not found by id, try session_id
+      if (!data && !error) {
+        const result = await supabase
+          .from('chat_sessions')
+          .select('*, agents(id, name)')
+          .eq('session_id', id)
+          .maybeSingle();
+        data = result.data;
+        error = result.error;
+      }
+      
       if (error) throw error;
       if (!data) return null;
       

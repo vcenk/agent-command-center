@@ -18,11 +18,14 @@ const Onboarding: React.FC = () => {
     if (!workspaceName) return;
     
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    createWorkspace(workspaceName);
-    setIsLoading(false);
-    navigate('/dashboard');
+    try {
+      await createWorkspace(workspaceName);
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error creating workspace:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

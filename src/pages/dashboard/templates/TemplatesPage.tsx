@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { agents, personas, knowledgeSources, auditLogs } from '@/lib/mockDb';
+import { useCreateAgent } from '@/hooks/useAgents';
+import { useCreatePersona } from '@/hooks/usePersonas';
+import { useCreateKnowledgeSource } from '@/hooks/useKnowledgeSources';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -295,6 +297,10 @@ export const TemplatesPage: React.FC = () => {
   const { workspace, user } = useAuth();
   const { toast } = useToast();
   
+  const createPersona = useCreatePersona();
+  const createKnowledgeSource = useCreateKnowledgeSource();
+  const createAgent = useCreateAgent();
+  
   const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -320,6 +326,19 @@ export const TemplatesPage: React.FC = () => {
       .replace(/{websiteUrl}/g, formData.websiteUrl || 'https://yourwebsite.com');
   };
 
+  // Map template industry to valid business_domain enum
+  const mapIndustryToDomain = (industry: string): 'healthcare' | 'retail' | 'finance' | 'realestate' | 'hospitality' | 'other' => {
+    const mapping: Record<string, 'healthcare' | 'retail' | 'finance' | 'realestate' | 'hospitality' | 'other'> = {
+      'general': 'other',
+      'services': 'other',
+      'sales': 'retail',
+      'customer service': 'other',
+      'enterprise': 'other',
+      'real estate': 'realestate',
+    };
+    return mapping[industry.toLowerCase()] || 'other';
+  };
+
   const handleSubmit = async () => {
     if (!selectedTemplate || !workspace || !user) return;
     if (!formData.agentName.trim() || !formData.businessName.trim()) {
@@ -335,56 +354,38 @@ export const TemplatesPage: React.FC = () => {
 
     try {
       // 1. Create Persona
-      const persona = personas.create({
-        workspaceId: workspace.id,
+      const persona = await createPersona.mutateAsync({
         name: `${formData.businessName} ${selectedTemplate.personaPreset.roleTitle}`,
-        roleTitle: selectedTemplate.personaPreset.roleTitle,
+        role_title: selectedTemplate.personaPreset.roleTitle,
         tone: selectedTemplate.personaPreset.tone,
-        styleNotes: replaceTemplateVariables(selectedTemplate.personaPreset.styleNotes),
-        doNotDo: selectedTemplate.personaPreset.doNotDo,
-        greetingScript: replaceTemplateVariables(selectedTemplate.personaPreset.greetingScript),
-        fallbackPolicy: selectedTemplate.personaPreset.fallbackPolicy,
-        escalationRules: replaceTemplateVariables(selectedTemplate.personaPreset.escalationRules),
+        style_notes: replaceTemplateVariables(selectedTemplate.personaPreset.styleNotes),
+        do_not_do: selectedTemplate.personaPreset.doNotDo,
+        greeting_script: replaceTemplateVariables(selectedTemplate.personaPreset.greetingScript),
+        fallback_policy: selectedTemplate.personaPreset.fallbackPolicy,
+        escalation_rules: replaceTemplateVariables(selectedTemplate.personaPreset.escalationRules),
       });
 
-      // 2. Create Knowledge Source (chunks are generated automatically by mockDb)
+      // 2. Create Knowledge Source
       const rawText = replaceTemplateVariables(selectedTemplate.knowledgePreset.contentTemplate);
-      const knowledgeSource = knowledgeSources.create({
-        workspaceId: workspace.id,
+      const knowledgeSource = await createKnowledgeSource.mutateAsync({
         name: replaceTemplateVariables(selectedTemplate.knowledgePreset.name),
         type: 'TEXT',
-        rawText,
+        raw_text: rawText,
         tags: [selectedTemplate.industry.toLowerCase(), 'template'],
+        url: null,
+        file_name: null,
       });
 
       // 3. Create Agent
-      const agent = agents.create({
-        workspaceId: workspace.id,
+      const agent = await createAgent.mutateAsync({
         name: formData.agentName,
-        businessDomain: selectedTemplate.industry.toLowerCase() as any,
-        personaId: persona.id,
+        business_domain: mapIndustryToDomain(selectedTemplate.industry),
+        persona_id: persona.id,
         channels: selectedTemplate.channels,
         goals: replaceTemplateVariables(selectedTemplate.goals),
-        allowedActions: [],
-        knowledgeSourceIds: [knowledgeSource.id],
+        allowed_actions: [],
+        knowledge_source_ids: [knowledgeSource.id],
         status: 'draft',
-      });
-
-      // 4. Log audit event
-      auditLogs.create({
-        workspaceId: workspace.id,
-        actorEmail: user.email,
-        actionType: 'create',
-        entityType: 'template_used',
-        entityId: agent.id,
-        before: null,
-        after: {
-          templateId: selectedTemplate.id,
-          templateName: selectedTemplate.name,
-          agentId: agent.id,
-          personaId: persona.id,
-          knowledgeSourceId: knowledgeSource.id,
-        },
       });
 
       toast({
@@ -395,6 +396,7 @@ export const TemplatesPage: React.FC = () => {
       setIsDialogOpen(false);
       navigate(`/dashboard/agents/${agent.id}`);
     } catch (error) {
+      console.error('Template creation error:', error);
       toast({
         title: 'Error',
         description: 'Failed to create agent from template.',

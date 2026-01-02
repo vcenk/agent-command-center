@@ -21,14 +21,17 @@ interface ChatMessage {
   content: string;
 }
 
-const SESSION_ID = 'dashboard-test';
 const SUPABASE_URL = 'https://ehvcrdooykxmcpcopuxz.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVodmNyZG9veWt4bWNwY29wdXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczODA0MDEsImV4cCI6MjA4Mjk1NjQwMX0.flymd8csmFzEM8jrPXZ7pylX78Yl_fKOnTOSxDp8k7I';
+
+// Generate a proper UUID for the session
+const generateSessionId = () => crypto.randomUUID();
 
 export default function TestChatPage() {
   const [searchParams] = useSearchParams();
   const { data: agents, isLoading: agentsLoading } = useAgents();
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>(() => generateSessionId());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +56,7 @@ export default function TestChatPage() {
   const handleNewSession = () => {
     setMessages([]);
     setInput('');
+    setSessionId(generateSessionId()); // New UUID for each session
   };
 
   const handleSend = async () => {
@@ -74,7 +78,7 @@ export default function TestChatPage() {
           },
           body: JSON.stringify({
             agentId: selectedAgentId,
-            sessionId: SESSION_ID,
+            sessionId: sessionId,
             messages: [...messages, userMessage],
           }),
         }
@@ -134,7 +138,7 @@ export default function TestChatPage() {
           },
           body: JSON.stringify({
             agentId: selectedAgentId,
-            sessionId: SESSION_ID,
+            sessionId: sessionId,
             messages: [
               ...messages,
               userMessage,

@@ -59,11 +59,14 @@ export interface KnowledgeSource {
   id: string;
   workspaceId: string;
   name: string;
-  type: 'PDF' | 'URL' | 'Text';
-  content: string;
+  type: 'PDF' | 'URL' | 'TEXT';
+  url?: string;
+  fileName?: string;
+  rawText: string;
   tags: string[];
   chunks: KnowledgeChunk[];
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface KnowledgeChunk {

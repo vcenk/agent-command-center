@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAgents } from '@/hooks/useAgents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +11,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Send, RotateCcw, Bot, User, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -19,8 +22,11 @@ interface ChatMessage {
 }
 
 const SESSION_ID = 'dashboard-test';
+const SUPABASE_URL = 'https://ehvcrdooykxmcpcopuxz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVodmNyZG9veWt4bWNwY29wdXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczODA0MDEsImV4cCI6MjA4Mjk1NjQwMX0.flymd8csmFzEM8jrPXZ7pylX78Yl_fKOnTOSxDp8k7I';
 
 export default function TestChatPage() {
+  const [searchParams] = useSearchParams();
   const { data: agents, isLoading: agentsLoading } = useAgents();
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -28,8 +34,17 @@ export default function TestChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const liveAgents = agents?.filter(a => a.status === 'live') || [];
-  const selectedAgent = liveAgents.find(a => a.id === selectedAgentId);
+  // Allow both draft and live agents for testing
+  const testableAgents = agents || [];
+  const selectedAgent = testableAgents.find(a => a.id === selectedAgentId);
+
+  // Set agent from URL query param on mount
+  useEffect(() => {
+    const agentFromUrl = searchParams.get('agent');
+    if (agentFromUrl && testableAgents.some(a => a.id === agentFromUrl)) {
+      setSelectedAgentId(agentFromUrl);
+    }
+  }, [searchParams, testableAgents]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -50,12 +65,12 @@ export default function TestChatPage() {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`,
+        `${SUPABASE_URL}/functions/v1/chat`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({
             agentId: selectedAgentId,
@@ -110,12 +125,12 @@ export default function TestChatPage() {
 
       // Log session
       await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/log-chat-session`,
+        `${SUPABASE_URL}/functions/v1/log-chat-session`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({
             agentId: selectedAgentId,
@@ -158,21 +173,26 @@ export default function TestChatPage() {
       <div className="flex items-center gap-4">
         <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
           <SelectTrigger className="w-64">
-            <SelectValue placeholder="Select a live agent" />
+            <SelectValue placeholder="Select an agent" />
           </SelectTrigger>
           <SelectContent>
             {agentsLoading ? (
               <SelectItem value="loading" disabled>
                 Loading agents...
               </SelectItem>
-            ) : liveAgents.length === 0 ? (
+            ) : testableAgents.length === 0 ? (
               <SelectItem value="none" disabled>
-                No live agents available
+                No agents available
               </SelectItem>
             ) : (
-              liveAgents.map(agent => (
+              testableAgents.map(agent => (
                 <SelectItem key={agent.id} value={agent.id}>
-                  {agent.name}
+                  <span className="flex items-center gap-2">
+                    {agent.name}
+                    {agent.status === 'draft' && (
+                      <Badge variant="secondary" className="text-xs">Draft</Badge>
+                    )}
+                  </span>
                 </SelectItem>
               ))
             )}
@@ -191,6 +211,9 @@ export default function TestChatPage() {
             <CardTitle className="text-base flex items-center gap-2">
               <Bot className="w-5 h-5 text-primary" />
               {selectedAgent?.name || 'Select an agent'}
+              {selectedAgent?.status === 'draft' && (
+                <Badge variant="secondary">Draft</Badge>
+              )}
             </CardTitle>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <AlertCircle className="w-3 h-3" />
@@ -202,7 +225,7 @@ export default function TestChatPage() {
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
           {!selectedAgentId ? (
             <div className="h-full flex items-center justify-center text-muted-foreground">
-              Select a live agent to start testing
+              Select an agent to start testing
             </div>
           ) : messages.length === 0 ? (
             <div className="h-full flex items-center justify-center text-muted-foreground">

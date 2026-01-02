@@ -24,6 +24,7 @@ import {
   Loader2,
   FileText,
   AlertTriangle,
+  Code,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -161,16 +162,24 @@ const AgentDetail: React.FC = () => {
             <p className="text-muted-foreground capitalize">{agent.business_domain}</p>
           </div>
         </div>
-        {hasPermission('write') && agent.status === 'draft' && (
-          <Button variant="glow" onClick={handlePublish} disabled={updateAgent.isPending}>
-            {updateAgent.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Rocket className="w-4 h-4 mr-2" />
-            )}
-            Publish Agent
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {hasPermission('write') && (
+            <Button variant="outline" onClick={() => navigate(`/dashboard/agents/${id}/install`)}>
+              <Code className="w-4 h-4 mr-2" />
+              Install Web Chat
+            </Button>
+          )}
+          {hasPermission('write') && agent.status === 'draft' && (
+            <Button variant="glow" onClick={handlePublish} disabled={updateAgent.isPending}>
+              {updateAgent.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Rocket className="w-4 h-4 mr-2" />
+              )}
+              Publish Agent
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

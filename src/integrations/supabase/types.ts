@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_web_widget_config: {
+        Row: {
+          agent_id: string
+          allowed_domains: string[]
+          created_at: string
+          enabled: boolean
+          id: string
+          launcher_label: string
+          position: string
+          primary_color: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          allowed_domains?: string[]
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          launcher_label?: string
+          position?: string
+          primary_color?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          allowed_domains?: string[]
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          launcher_label?: string
+          position?: string
+          primary_color?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_web_widget_config_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           allowed_actions: string[] | null

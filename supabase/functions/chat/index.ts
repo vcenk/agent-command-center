@@ -173,6 +173,40 @@ serve(async (req) => {
       console.error("Error loading agent:", agentError);
     }
 
+    // Validate domain against allowed_domains
+    const origin = req.headers.get("origin") || req.headers.get("referer") || "";
+    let requestHostname = "";
+    try {
+      if (origin) {
+        requestHostname = new URL(origin).hostname;
+      }
+    } catch (e) {
+      console.log("Could not parse origin:", origin);
+    }
+
+    // Load widget config to check allowed domains
+    const { data: widgetConfig } = await supabase
+      .from("agent_web_widget_config")
+      .select("allowed_domains, enabled")
+      .eq("agent_id", agentId)
+      .maybeSingle();
+
+    if (widgetConfig && widgetConfig.allowed_domains && widgetConfig.allowed_domains.length > 0) {
+      const allowed = widgetConfig.allowed_domains.some((domain: string) => {
+        return requestHostname === domain ||
+               requestHostname.endsWith("." + domain) ||
+               (domain === "localhost" && (requestHostname === "localhost" || requestHostname === "127.0.0.1"));
+      });
+
+      if (!allowed && requestHostname) {
+        console.log(`Domain not allowed: ${requestHostname}. Allowed: ${widgetConfig.allowed_domains.join(", ")}`);
+        return new Response(
+          JSON.stringify({ error: "Domain not allowed" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Extract contact info from user messages (non-blocking lead capture)
     if (sessionId && agent?.workspace_id) {
       const allUserText = messages

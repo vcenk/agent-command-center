@@ -231,9 +231,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const createWorkspace = async (name: string): Promise<Workspace> => {
+    if (!user) throw new Error('User not authenticated');
+    
     const { data, error } = await supabase
       .from('workspaces')
-      .insert({ name })
+      .insert({ name, created_by: user.id })
       .select()
       .single();
 

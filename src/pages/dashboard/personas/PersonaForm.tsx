@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { personas, auditLogs } from '@/lib/mockDb';
-import { Persona } from '@/types';
+import { usePersona, useCreatePersona, useUpdatePersona, PersonaRow } from '@/hooks/usePersonas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -17,64 +17,57 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ArrowLeft, Save, X, Plus, MessageSquare, Bot } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 const tones = ['professional', 'friendly', 'casual', 'formal'] as const;
 const fallbackPolicies = ['apologize', 'escalate', 'retry', 'transfer'] as const;
 
 const PersonaForm: React.FC = () => {
   const { id } = useParams();
-  const { workspace, user } = useAuth();
+  const { workspace } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const isEditing = id && id !== 'new';
 
-  const existingPersona = isEditing ? personas.getById(id) : null;
+  const { data: existingPersona, isLoading: isLoadingPersona } = usePersona(isEditing ? id : undefined);
+  const createPersona = useCreatePersona();
+  const updatePersona = useUpdatePersona();
 
   const [formData, setFormData] = useState({
-    name: existingPersona?.name || '',
-    roleTitle: existingPersona?.roleTitle || '',
-    tone: existingPersona?.tone || 'professional' as Persona['tone'],
-    styleNotes: existingPersona?.styleNotes || '',
-    doNotDo: existingPersona?.doNotDo || [] as string[],
-    greetingScript: existingPersona?.greetingScript || '',
-    fallbackPolicy: existingPersona?.fallbackPolicy || 'apologize' as Persona['fallbackPolicy'],
-    escalationRules: existingPersona?.escalationRules || '',
+    name: '',
+    role_title: '',
+    tone: 'professional' as PersonaRow['tone'],
+    style_notes: '',
+    do_not_do: [] as string[],
+    greeting_script: '',
+    fallback_policy: 'apologize' as PersonaRow['fallback_policy'],
+    escalation_rules: '',
   });
 
   const [newDoNotDo, setNewDoNotDo] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Populate form when editing
+  useEffect(() => {
+    if (existingPersona) {
+      setFormData({
+        name: existingPersona.name,
+        role_title: existingPersona.role_title,
+        tone: existingPersona.tone,
+        style_notes: existingPersona.style_notes || '',
+        do_not_do: existingPersona.do_not_do || [],
+        greeting_script: existingPersona.greeting_script || '',
+        fallback_policy: existingPersona.fallback_policy,
+        escalation_rules: existingPersona.escalation_rules || '',
+      });
+    }
+  }, [existingPersona]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workspace || !user) return;
+    if (!workspace) return;
 
     if (isEditing && existingPersona) {
-      const updated = personas.update(existingPersona.id, formData);
-      auditLogs.create({
-        workspaceId: workspace.id,
-        actorEmail: user.email,
-        actionType: 'update',
-        entityType: 'persona',
-        entityId: existingPersona.id,
-        before: { id: existingPersona.id, name: existingPersona.name },
-        after: { id: existingPersona.id, name: formData.name },
-      });
-      toast({ title: 'Persona updated', description: `${formData.name} has been saved.` });
+      await updatePersona.mutateAsync({ id: existingPersona.id, ...formData });
     } else {
-      const newPersona = personas.create({
-        ...formData,
-        workspaceId: workspace.id,
-      });
-      auditLogs.create({
-        workspaceId: workspace.id,
-        actorEmail: user.email,
-        actionType: 'create',
-        entityType: 'persona',
-        entityId: newPersona.id,
-        before: null,
-        after: { id: newPersona.id, name: newPersona.name },
-      });
-      toast({ title: 'Persona created', description: `${formData.name} is ready to use.` });
+      await createPersona.mutateAsync(formData);
     }
 
     navigate('/dashboard/personas');
@@ -84,7 +77,7 @@ const PersonaForm: React.FC = () => {
     if (newDoNotDo.trim()) {
       setFormData(prev => ({
         ...prev,
-        doNotDo: [...prev.doNotDo, newDoNotDo.trim()],
+        do_not_do: [...prev.do_not_do, newDoNotDo.trim()],
       }));
       setNewDoNotDo('');
     }
@@ -93,14 +86,14 @@ const PersonaForm: React.FC = () => {
   const removeDoNotDo = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      doNotDo: prev.doNotDo.filter((_, i) => i !== index),
+      do_not_do: prev.do_not_do.filter((_, i) => i !== index),
     }));
   };
 
   const generateMockGreeting = () => {
     const name = formData.name || 'Assistant';
-    const role = formData.roleTitle || 'your assistant';
-    const toneGreetings: Record<Persona['tone'], string> = {
+    const role = formData.role_title || 'your assistant';
+    const toneGreetings: Record<PersonaRow['tone'], string> = {
       professional: `Good day! This is ${name}, ${role}. How may I assist you today?`,
       friendly: `Hey there! I'm ${name}, ${role}. What can I help you with?`,
       casual: `Hi! ${name} here. What's up?`,
@@ -110,7 +103,7 @@ const PersonaForm: React.FC = () => {
   };
 
   const generateMockResponse = () => {
-    const responses: Record<Persona['tone'], string> = {
+    const responses: Record<PersonaRow['tone'], string> = {
       professional: "I understand your concern. Let me look into that for you right away. Based on our records, I can help you with that request.",
       friendly: "Oh, I totally get that! Let me check on that for you. Give me just a sec... Great news! I found what you need!",
       casual: "Got it! Let me see... Yep, I can help with that. Here's what you need to know.",
@@ -118,6 +111,24 @@ const PersonaForm: React.FC = () => {
     };
     return responses[formData.tone];
   };
+
+  if (isEditing && isLoadingPersona) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+          <Skeleton className="h-80 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  const isSubmitting = createPersona.isPending || updatePersona.isPending;
 
   return (
     <div className="space-y-6">
@@ -159,8 +170,8 @@ const PersonaForm: React.FC = () => {
                   <Label htmlFor="roleTitle">Role Title</Label>
                   <Input
                     id="roleTitle"
-                    value={formData.roleTitle}
-                    onChange={(e) => setFormData(prev => ({ ...prev, roleTitle: e.target.value }))}
+                    value={formData.role_title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, role_title: e.target.value }))}
                     placeholder="Dental Receptionist"
                     required
                   />
@@ -179,7 +190,7 @@ const PersonaForm: React.FC = () => {
                 <Label htmlFor="tone">Tone</Label>
                 <Select
                   value={formData.tone}
-                  onValueChange={(v) => setFormData(prev => ({ ...prev, tone: v as Persona['tone'] }))}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, tone: v as PersonaRow['tone'] }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -195,8 +206,8 @@ const PersonaForm: React.FC = () => {
                 <Label htmlFor="styleNotes">Style Notes</Label>
                 <Textarea
                   id="styleNotes"
-                  value={formData.styleNotes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, styleNotes: e.target.value }))}
+                  value={formData.style_notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, style_notes: e.target.value }))}
                   placeholder="e.g., Always confirm appointment details, use patient's first name..."
                   rows={3}
                 />
@@ -214,8 +225,8 @@ const PersonaForm: React.FC = () => {
                 <Label htmlFor="greetingScript">Greeting Script</Label>
                 <Textarea
                   id="greetingScript"
-                  value={formData.greetingScript}
-                  onChange={(e) => setFormData(prev => ({ ...prev, greetingScript: e.target.value }))}
+                  value={formData.greeting_script}
+                  onChange={(e) => setFormData(prev => ({ ...prev, greeting_script: e.target.value }))}
                   placeholder="Hello! Thank you for calling [Company]. This is [Name]. How may I help you today?"
                   rows={3}
                 />
@@ -242,9 +253,9 @@ const PersonaForm: React.FC = () => {
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
-                {formData.doNotDo.length > 0 && (
+                {formData.do_not_do.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.doNotDo.map((item, idx) => (
+                    {formData.do_not_do.map((item, idx) => (
                       <Badge key={idx} variant="secondary" className="gap-1 pr-1">
                         {item}
                         <button
@@ -263,8 +274,8 @@ const PersonaForm: React.FC = () => {
               <div className="space-y-2">
                 <Label htmlFor="fallbackPolicy">Fallback Policy</Label>
                 <Select
-                  value={formData.fallbackPolicy}
-                  onValueChange={(v) => setFormData(prev => ({ ...prev, fallbackPolicy: v as Persona['fallbackPolicy'] }))}
+                  value={formData.fallback_policy}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, fallback_policy: v as PersonaRow['fallback_policy'] }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -281,8 +292,8 @@ const PersonaForm: React.FC = () => {
                 <Label htmlFor="escalationRules">Escalation Rules</Label>
                 <Textarea
                   id="escalationRules"
-                  value={formData.escalationRules}
-                  onChange={(e) => setFormData(prev => ({ ...prev, escalationRules: e.target.value }))}
+                  value={formData.escalation_rules}
+                  onChange={(e) => setFormData(prev => ({ ...prev, escalation_rules: e.target.value }))}
                   placeholder="e.g., Escalate to manager if customer mentions legal action or requests refund over $500..."
                   rows={3}
                 />
@@ -294,9 +305,9 @@ const PersonaForm: React.FC = () => {
             <Button type="button" variant="outline" onClick={() => navigate('/dashboard/personas')}>
               Cancel
             </Button>
-            <Button type="submit" variant="glow">
+            <Button type="submit" variant="glow" disabled={isSubmitting}>
               <Save className="w-4 h-4 mr-2" />
-              {isEditing ? 'Save Changes' : 'Create Persona'}
+              {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Persona'}
             </Button>
           </div>
         </form>
@@ -319,7 +330,7 @@ const PersonaForm: React.FC = () => {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-foreground mb-1">Greeting</p>
                     <p className="text-sm text-muted-foreground">
-                      {formData.greetingScript || generateMockGreeting()}
+                      {formData.greeting_script || generateMockGreeting()}
                     </p>
                   </div>
                 </div>
@@ -346,9 +357,9 @@ const PersonaForm: React.FC = () => {
 
               <div className="text-xs text-muted-foreground space-y-1">
                 <p><strong>Tone:</strong> {formData.tone}</p>
-                <p><strong>Fallback:</strong> {formData.fallbackPolicy}</p>
-                {formData.doNotDo.length > 0 && (
-                  <p><strong>Restrictions:</strong> {formData.doNotDo.length} defined</p>
+                <p><strong>Fallback:</strong> {formData.fallback_policy}</p>
+                {formData.do_not_do.length > 0 && (
+                  <p><strong>Restrictions:</strong> {formData.do_not_do.length} defined</p>
                 )}
               </div>
             </CardContent>

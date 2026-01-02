@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { agents, channelConfigs, auditLogs } from '@/lib/mockDb';
-import { Agent, ChannelConfig } from '@/types';
+import { useAgents, useUpdateAgent, AgentRow } from '@/hooks/useAgents';
+import { useChannelConfigs, useUpsertChannelConfig } from '@/hooks/useChannelConfigs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -30,7 +31,6 @@ import {
   Settings,
   Copy,
   Check,
-  Radio,
   Bot,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -47,7 +47,6 @@ interface ChannelCardProps {
 }
 
 const ChannelCard: React.FC<ChannelCardProps> = ({
-  type,
   title,
   description,
   icon,
@@ -83,13 +82,17 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
 );
 
 const ChannelsPage: React.FC = () => {
-  const { workspace, user, hasPermission } = useAuth();
+  const { workspace, hasPermission } = useAuth();
   const { toast } = useToast();
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [activeChannel, setActiveChannel] = useState<ChannelType | null>(null);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
-  const [, forceUpdate] = useState({});
+
+  const { data: agents = [], isLoading: isLoadingAgents } = useAgents();
+  const { data: channelConfigs = [] } = useChannelConfigs(selectedAgentId || undefined);
+  const updateAgent = useUpdateAgent();
+  const upsertChannelConfig = useUpsertChannelConfig();
 
   // Channel configs state
   const [webChatConfig, setWebChatConfig] = useState({ enabled: false, greeting: '', embedSnippet: '' });
@@ -104,49 +107,47 @@ const ChannelsPage: React.FC = () => {
   const [smsConfig, setSmsConfig] = useState({ enabled: false, senderId: '' });
   const [whatsappConfig, setWhatsappConfig] = useState({ enabled: false, senderId: '' });
 
-  if (!workspace) return null;
-
-  const workspaceAgents = agents.getByWorkspace(workspace.id);
-  const selectedAgent = selectedAgentId ? agents.getById(selectedAgentId) : null;
+  const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
   // Load channel configs when agent changes
   useEffect(() => {
-    if (selectedAgentId) {
-      const configs = channelConfigs.getByAgent(selectedAgentId);
-      
-      const webChat = configs.find(c => c.channel === 'webChat');
-      const phone = configs.find(c => c.channel === 'phone');
-      const sms = configs.find(c => c.channel === 'sms');
-      const whatsapp = configs.find(c => c.channel === 'whatsapp');
+    if (selectedAgentId && selectedAgent) {
+      const webChat = channelConfigs.find(c => c.channel === 'webChat');
+      const phone = channelConfigs.find(c => c.channel === 'phone');
+      const sms = channelConfigs.find(c => c.channel === 'sms');
+      const whatsapp = channelConfigs.find(c => c.channel === 'whatsapp');
 
+      const channels = selectedAgent.channels as { webChat?: boolean; phone?: boolean; sms?: boolean; whatsapp?: boolean };
       const snippet = generateEmbedSnippet(selectedAgentId);
 
       setWebChatConfig({
-        enabled: selectedAgent?.channels.webChat || false,
+        enabled: channels?.webChat || false,
         greeting: webChat?.greeting || 'Hello! How can I help you today?',
         embedSnippet: snippet,
       });
 
       setPhoneConfig({
-        enabled: selectedAgent?.channels.phone || false,
-        phoneNumber: phone?.phoneNumber || '+1 (555) 123-4567',
-        businessHours: phone?.businessHours || '9am-5pm',
-        voicemailFallback: phone?.voicemailFallback ?? true,
-        escalationToHuman: phone?.escalationToHuman ?? false,
+        enabled: channels?.phone || false,
+        phoneNumber: phone?.phone_number || '+1 (555) 123-4567',
+        businessHours: phone?.business_hours || '9am-5pm',
+        voicemailFallback: phone?.voicemail_fallback ?? true,
+        escalationToHuman: phone?.escalation_to_human ?? false,
         provider: phone?.provider || 'twilio',
       });
 
       setSmsConfig({
-        enabled: selectedAgent?.channels.sms || false,
+        enabled: channels?.sms || false,
         senderId: sms?.greeting || '',
       });
 
       setWhatsappConfig({
-        enabled: selectedAgent?.channels.whatsapp || false,
+        enabled: channels?.whatsapp || false,
         senderId: whatsapp?.greeting || '',
       });
     }
-  }, [selectedAgentId, selectedAgent]);
+  }, [selectedAgentId, selectedAgent, channelConfigs]);
+
+  if (!workspace) return null;
 
   const generateEmbedSnippet = (agentId: string) => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ehvcrdooykxmcpcopuxz.supabase.co';
@@ -269,49 +270,36 @@ const ChannelsPage: React.FC = () => {
     setConfigDialogOpen(true);
   };
 
-  const saveChannelConfig = (channel: ChannelType, enabled: boolean, config: Partial<ChannelConfig>) => {
-    if (!selectedAgentId || !hasPermission('write')) return;
-
-    // Get current state for audit log
-    const existingConfigs = channelConfigs.getByAgent(selectedAgentId);
-    const existingConfig = existingConfigs.find(c => c.channel === channel);
+  const saveChannelConfig = async (channel: ChannelType, enabled: boolean, config: Record<string, unknown>) => {
+    if (!selectedAgentId || !hasPermission('write') || !selectedAgent) return;
 
     // Update agent's channel status
-    const agent = agents.getById(selectedAgentId);
-    if (agent) {
-      const updatedChannels = { ...agent.channels, [channel]: enabled };
-      agents.update(selectedAgentId, { channels: updatedChannels });
-    }
+    const currentChannels = selectedAgent.channels as { webChat?: boolean; phone?: boolean; sms?: boolean; whatsapp?: boolean };
+    const updatedChannels = { 
+      webChat: currentChannels?.webChat ?? false,
+      phone: currentChannels?.phone ?? false,
+      sms: currentChannels?.sms ?? false,
+      whatsapp: currentChannels?.whatsapp ?? false,
+      [channel]: enabled 
+    };
+    
+    await updateAgent.mutateAsync({ 
+      id: selectedAgentId, 
+      channels: updatedChannels 
+    });
 
     // Save channel config
-    channelConfigs.upsert({
-      agentId: selectedAgentId,
+    await upsertChannelConfig.mutateAsync({
+      agent_id: selectedAgentId,
       channel,
-      greeting: config.greeting || '',
-      voicemailFallback: config.voicemailFallback ?? false,
-      businessHours: config.businessHours || '',
-      escalationToHuman: config.escalationToHuman ?? false,
-      provider: config.provider,
-      phoneNumber: config.phoneNumber,
+      greeting: (config.greeting as string) || '',
+      voicemail_fallback: (config.voicemail_fallback as boolean) ?? false,
+      business_hours: (config.business_hours as string) || '',
+      escalation_to_human: (config.escalation_to_human as boolean) ?? false,
+      provider: (config.provider as string) || null,
+      phone_number: (config.phone_number as string) || null,
     });
 
-    // Audit log
-    auditLogs.create({
-      workspaceId: workspace.id,
-      actorEmail: user?.email || '',
-      actionType: 'update',
-      entityType: 'channel_config',
-      entityId: `${selectedAgentId}_${channel}`,
-      before: existingConfig ? { enabled: agent?.channels[channel], ...existingConfig } as unknown as Record<string, unknown> : null,
-      after: { enabled, channel, ...config } as unknown as Record<string, unknown>,
-    });
-
-    toast({
-      title: 'Channel updated',
-      description: `${channel} configuration saved.`,
-    });
-
-    forceUpdate({});
     setConfigDialogOpen(false);
   };
 
@@ -339,7 +327,7 @@ const ChannelsPage: React.FC = () => {
       <div className="space-y-2">
         <Label>Embed Snippet</Label>
         <div className="relative">
-          <pre className="p-4 bg-secondary/50 rounded-lg text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+          <pre className="p-4 bg-secondary/50 rounded-lg text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
             {webChatConfig.embedSnippet}
           </pre>
           <Button
@@ -398,9 +386,6 @@ const ChannelsPage: React.FC = () => {
           onChange={(e) => setPhoneConfig(prev => ({ ...prev, phoneNumber: e.target.value }))}
           placeholder="+1 (555) 123-4567"
         />
-        <p className="text-xs text-muted-foreground">
-          This is your assigned number for inbound calls.
-        </p>
       </div>
 
       <div className="space-y-2">
@@ -445,10 +430,10 @@ const ChannelsPage: React.FC = () => {
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>Cancel</Button>
         <Button onClick={() => saveChannelConfig('phone', phoneConfig.enabled, {
-          phoneNumber: phoneConfig.phoneNumber,
-          businessHours: phoneConfig.businessHours,
-          voicemailFallback: phoneConfig.voicemailFallback,
-          escalationToHuman: phoneConfig.escalationToHuman,
+          phone_number: phoneConfig.phoneNumber,
+          business_hours: phoneConfig.businessHours,
+          voicemail_fallback: phoneConfig.voicemailFallback,
+          escalation_to_human: phoneConfig.escalationToHuman,
           provider: phoneConfig.provider,
         })}>
           Save Configuration
@@ -543,6 +528,23 @@ const ChannelsPage: React.FC = () => {
     }
   };
 
+  if (isLoadingAgents) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-32 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Skeleton className="h-32 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -567,7 +569,7 @@ const ChannelsPage: React.FC = () => {
               <SelectValue placeholder="Select an agent" />
             </SelectTrigger>
             <SelectContent>
-              {workspaceAgents.map(agent => (
+              {agents.map(agent => (
                 <SelectItem key={agent.id} value={agent.id}>
                   <div className="flex items-center gap-2">
                     <Bot className="w-4 h-4" />
@@ -581,7 +583,7 @@ const ChannelsPage: React.FC = () => {
             </SelectContent>
           </Select>
 
-          {workspaceAgents.length === 0 && (
+          {agents.length === 0 && (
             <p className="text-sm text-muted-foreground mt-4">
               No agents found. Create an agent first to configure channels.
             </p>
@@ -590,56 +592,41 @@ const ChannelsPage: React.FC = () => {
       </Card>
 
       {/* Channel Cards */}
-      {selectedAgent && (
+      {selectedAgentId && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ChannelCard
             type="webChat"
             title="Web Chat"
             description="Embed a chat widget on your website"
-            icon={<MessageSquare className="w-6 h-6" />}
-            enabled={selectedAgent.channels.webChat}
+            icon={<MessageSquare className="w-5 h-5" />}
+            enabled={webChatConfig.enabled}
             onConfigure={() => openConfigDialog('webChat')}
           />
           <ChannelCard
             type="phone"
             title="Phone"
-            description="Handle inbound and outbound voice calls"
-            icon={<Phone className="w-6 h-6" />}
-            enabled={selectedAgent.channels.phone}
+            description="Handle inbound and outbound calls"
+            icon={<Phone className="w-5 h-5" />}
+            enabled={phoneConfig.enabled}
             onConfigure={() => openConfigDialog('phone')}
           />
           <ChannelCard
             type="sms"
             title="SMS"
             description="Send and receive text messages"
-            icon={<MessageCircle className="w-6 h-6" />}
-            enabled={selectedAgent.channels.sms}
+            icon={<MessageCircle className="w-5 h-5" />}
+            enabled={smsConfig.enabled}
             onConfigure={() => openConfigDialog('sms')}
           />
           <ChannelCard
             type="whatsapp"
             title="WhatsApp"
-            description="Connect via WhatsApp Business API"
-            icon={<Smartphone className="w-6 h-6" />}
-            enabled={selectedAgent.channels.whatsapp}
+            description="Connect via WhatsApp Business"
+            icon={<Smartphone className="w-5 h-5" />}
+            enabled={whatsappConfig.enabled}
             onConfigure={() => openConfigDialog('whatsapp')}
           />
         </div>
-      )}
-
-      {/* Empty State */}
-      {!selectedAgentId && workspaceAgents.length > 0 && (
-        <Card className="glass border-border/50">
-          <CardContent className="py-16 text-center">
-            <Radio className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              Select an agent to configure channels
-            </h3>
-            <p className="text-muted-foreground">
-              Choose an agent from the dropdown above to view and configure its communication channels.
-            </p>
-          </CardContent>
-        </Card>
       )}
 
       {/* Configuration Dialog */}
@@ -648,7 +635,7 @@ const ChannelsPage: React.FC = () => {
           <DialogHeader>
             <DialogTitle>{getDialogTitle()}</DialogTitle>
             <DialogDescription>
-              Configure how this channel works for {selectedAgent?.name}
+              Configure settings for this channel
             </DialogDescription>
           </DialogHeader>
           {getDialogContent()}

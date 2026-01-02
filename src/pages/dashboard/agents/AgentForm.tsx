@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { agents, personas, knowledgeSources, auditLogs } from '@/lib/mockDb';
-import { Agent } from '@/types';
+import { useAgent, useCreateAgent, useUpdateAgent } from '@/hooks/useAgents';
+import { usePersonas } from '@/hooks/usePersonas';
+import { useKnowledgeSources } from '@/hooks/useKnowledgeSources';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -17,69 +19,69 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ArrowLeft, Save } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 const domains = ['healthcare', 'retail', 'finance', 'realestate', 'hospitality', 'other'] as const;
 const actions = ['Book appointment (Calendly)', 'Send webhook (POST)', 'Send email', 'Transfer to human'];
 
 const AgentForm: React.FC = () => {
   const { id } = useParams();
-  const { workspace, user } = useAuth();
+  const { workspace } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const isEditing = id && id !== 'new';
 
-  const existingAgent = isEditing ? agents.getById(id) : null;
-  const workspacePersonas = workspace ? personas.getByWorkspace(workspace.id) : [];
-  const workspaceKnowledge = workspace ? knowledgeSources.getByWorkspace(workspace.id) : [];
+  const { data: existingAgent, isLoading: isLoadingAgent } = useAgent(isEditing ? id : undefined);
+  const { data: personas = [] } = usePersonas();
+  const { data: knowledgeSources = [] } = useKnowledgeSources();
+  
+  const createAgent = useCreateAgent();
+  const updateAgent = useUpdateAgent();
 
   const [formData, setFormData] = useState({
-    name: existingAgent?.name || '',
-    businessDomain: existingAgent?.businessDomain || 'other' as typeof domains[number],
-    personaId: existingAgent?.personaId || '',
-    goals: existingAgent?.goals || '',
-    allowedActions: existingAgent?.allowedActions || [] as string[],
-    knowledgeSourceIds: existingAgent?.knowledgeSourceIds || [] as string[],
-    channels: existingAgent?.channels || {
+    name: '',
+    business_domain: 'other' as typeof domains[number],
+    persona_id: null as string | null,
+    goals: '',
+    allowed_actions: [] as string[],
+    knowledge_source_ids: [] as string[],
+    channels: {
       webChat: true,
       phone: false,
       sms: false,
       whatsapp: false,
     },
+    status: 'draft' as 'draft' | 'live',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Populate form when editing
+  useEffect(() => {
+    if (existingAgent) {
+      const channels = existingAgent.channels as { webChat?: boolean; phone?: boolean; sms?: boolean; whatsapp?: boolean };
+      setFormData({
+        name: existingAgent.name,
+        business_domain: existingAgent.business_domain,
+        persona_id: existingAgent.persona_id,
+        goals: existingAgent.goals || '',
+        allowed_actions: existingAgent.allowed_actions || [],
+        knowledge_source_ids: existingAgent.knowledge_source_ids || [],
+        channels: {
+          webChat: channels?.webChat ?? true,
+          phone: channels?.phone ?? false,
+          sms: channels?.sms ?? false,
+          whatsapp: channels?.whatsapp ?? false,
+        },
+        status: existingAgent.status,
+      });
+    }
+  }, [existingAgent]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workspace || !user) return;
+    if (!workspace) return;
 
     if (isEditing && existingAgent) {
-      const updated = agents.update(existingAgent.id, formData);
-      auditLogs.create({
-        workspaceId: workspace.id,
-        actorEmail: user.email,
-        actionType: 'update',
-        entityType: 'agent',
-        entityId: existingAgent.id,
-        before: { id: existingAgent.id, name: existingAgent.name },
-        after: { id: existingAgent.id, name: formData.name },
-      });
-      toast({ title: 'Agent updated', description: `${formData.name} has been saved.` });
+      await updateAgent.mutateAsync({ id: existingAgent.id, ...formData });
     } else {
-      const newAgent = agents.create({
-        ...formData,
-        workspaceId: workspace.id,
-        status: 'draft',
-      });
-      auditLogs.create({
-        workspaceId: workspace.id,
-        actorEmail: user.email,
-        actionType: 'create',
-        entityType: 'agent',
-        entityId: newAgent.id,
-        before: null,
-        after: { id: newAgent.id, name: newAgent.name },
-      });
-      toast({ title: 'Agent created', description: `${formData.name} is ready to configure.` });
+      await createAgent.mutateAsync(formData);
     }
 
     navigate('/dashboard/agents');
@@ -88,20 +90,32 @@ const AgentForm: React.FC = () => {
   const toggleAction = (action: string) => {
     setFormData(prev => ({
       ...prev,
-      allowedActions: prev.allowedActions.includes(action)
-        ? prev.allowedActions.filter(a => a !== action)
-        : [...prev.allowedActions, action],
+      allowed_actions: prev.allowed_actions.includes(action)
+        ? prev.allowed_actions.filter(a => a !== action)
+        : [...prev.allowed_actions, action],
     }));
   };
 
   const toggleKnowledge = (id: string) => {
     setFormData(prev => ({
       ...prev,
-      knowledgeSourceIds: prev.knowledgeSourceIds.includes(id)
-        ? prev.knowledgeSourceIds.filter(k => k !== id)
-        : [...prev.knowledgeSourceIds, id],
+      knowledge_source_ids: prev.knowledge_source_ids.includes(id)
+        ? prev.knowledge_source_ids.filter(k => k !== id)
+        : [...prev.knowledge_source_ids, id],
     }));
   };
+
+  if (isEditing && isLoadingAgent) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  const isSubmitting = createAgent.isPending || updateAgent.isPending;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -139,8 +153,8 @@ const AgentForm: React.FC = () => {
             <div className="space-y-2">
               <Label htmlFor="domain">Business Domain</Label>
               <Select
-                value={formData.businessDomain}
-                onValueChange={(v) => setFormData(prev => ({ ...prev, businessDomain: v as typeof domains[number] }))}
+                value={formData.business_domain}
+                onValueChange={(v) => setFormData(prev => ({ ...prev, business_domain: v as typeof domains[number] }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -156,15 +170,15 @@ const AgentForm: React.FC = () => {
             <div className="space-y-2">
               <Label htmlFor="persona">Persona</Label>
               <Select
-                value={formData.personaId || 'none'}
-                onValueChange={(v) => setFormData(prev => ({ ...prev, personaId: v === 'none' ? '' : v }))}
+                value={formData.persona_id || 'none'}
+                onValueChange={(v) => setFormData(prev => ({ ...prev, persona_id: v === 'none' ? null : v }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a persona" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No persona</SelectItem>
-                  {workspacePersonas.map(p => (
+                  {personas.map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -221,7 +235,7 @@ const AgentForm: React.FC = () => {
                 <div key={action} className="flex items-center space-x-3">
                   <Checkbox
                     id={action}
-                    checked={formData.allowedActions.includes(action)}
+                    checked={formData.allowed_actions.includes(action)}
                     onCheckedChange={() => toggleAction(action)}
                   />
                   <Label htmlFor={action} className="cursor-pointer">{action}</Label>
@@ -231,7 +245,7 @@ const AgentForm: React.FC = () => {
           </CardContent>
         </Card>
 
-        {workspaceKnowledge.length > 0 && (
+        {knowledgeSources.length > 0 && (
           <Card className="glass border-border/50">
             <CardHeader>
               <CardTitle>Knowledge Base</CardTitle>
@@ -239,11 +253,11 @@ const AgentForm: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {workspaceKnowledge.map(k => (
+                {knowledgeSources.map(k => (
                   <div key={k.id} className="flex items-center space-x-3">
                     <Checkbox
                       id={k.id}
-                      checked={formData.knowledgeSourceIds.includes(k.id)}
+                      checked={formData.knowledge_source_ids.includes(k.id)}
                       onCheckedChange={() => toggleKnowledge(k.id)}
                     />
                     <Label htmlFor={k.id} className="cursor-pointer">
@@ -261,9 +275,9 @@ const AgentForm: React.FC = () => {
           <Button type="button" variant="outline" onClick={() => navigate('/dashboard/agents')}>
             Cancel
           </Button>
-          <Button type="submit" variant="glow">
+          <Button type="submit" variant="glow" disabled={isSubmitting}>
             <Save className="w-4 h-4 mr-2" />
-            {isEditing ? 'Save Changes' : 'Create Agent'}
+            {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Agent'}
           </Button>
         </div>
       </form>

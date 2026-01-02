@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { knowledgeSources, auditLogs, usage } from '@/lib/mockDb';
-import { KnowledgeSource } from '@/types';
+import { useCreateKnowledgeSource } from '@/hooks/useKnowledgeSources';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,11 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Link as LinkIcon, Type, X, Upload, ArrowLeft } from 'lucide-react';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 const KnowledgeForm: React.FC = () => {
   const navigate = useNavigate();
-  const { workspace, user } = useAuth();
+  const { workspace } = useAuth();
+  const { toast } = useToast();
+  const createKnowledge = useCreateKnowledgeSource();
 
   const [type, setType] = useState<'PDF' | 'URL' | 'TEXT'>('TEXT');
   const [name, setName] = useState('');
@@ -24,7 +25,6 @@ const KnowledgeForm: React.FC = () => {
   const [rawText, setRawText] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
   if (!workspace) return null;
 
@@ -52,41 +52,25 @@ const KnowledgeForm: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
-      toast.error('Please enter a name');
+      toast({ title: 'Error', description: 'Please enter a name', variant: 'destructive' });
       return;
     }
     if (!rawText.trim()) {
-      toast.error('Please enter content');
+      toast({ title: 'Error', description: 'Please enter content', variant: 'destructive' });
       return;
     }
 
-    setIsSaving(true);
-
-    const newSource = knowledgeSources.create({
-      workspaceId: workspace.id,
+    await createKnowledge.mutateAsync({
       name: name.trim(),
       type,
-      url: type === 'URL' ? url : undefined,
-      fileName: type === 'PDF' ? fileName : undefined,
-      rawText: rawText.trim(),
+      url: type === 'URL' ? url : null,
+      file_name: type === 'PDF' ? fileName : null,
+      raw_text: rawText.trim(),
       tags,
     });
 
-    auditLogs.create({
-      workspaceId: workspace.id,
-      actorEmail: user?.email || '',
-      actionType: 'create',
-      entityType: 'knowledge',
-      entityId: newSource.id,
-      before: null,
-      after: newSource as unknown as Record<string, unknown>,
-    });
-
-    usage.increment(workspace.id, 'knowledgeUploads');
-
-    toast.success('Knowledge source created');
     navigate('/dashboard/knowledge');
   };
 
@@ -273,8 +257,12 @@ const KnowledgeForm: React.FC = () => {
               <CardTitle>Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button onClick={handleSave} className="w-full" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Knowledge'}
+              <Button 
+                onClick={handleSave} 
+                className="w-full" 
+                disabled={createKnowledge.isPending}
+              >
+                {createKnowledge.isPending ? 'Saving...' : 'Save Knowledge'}
               </Button>
               <Button 
                 variant="outline" 

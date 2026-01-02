@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { agents, personas, auditLogs } from '@/lib/mockDb';
-import { Agent } from '@/types';
+import { useAgents, useDeleteAgent, AgentRow } from '@/hooks/useAgents';
+import { usePersonas } from '@/hooks/usePersonas';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Bot,
   Plus,
@@ -24,52 +25,62 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
 
 const AgentsList: React.FC = () => {
-  const { workspace, user, hasPermission } = useAuth();
+  const { workspace, hasPermission } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [search, setSearch] = useState('');
+  
+  const { data: agents = [], isLoading } = useAgents();
+  const { data: personas = [] } = usePersonas();
+  const deleteAgent = useDeleteAgent();
 
   if (!workspace) return null;
 
-  const workspaceAgents = agents.getByWorkspace(workspace.id);
-  const filteredAgents = workspaceAgents.filter(
+  const filteredAgents = agents.filter(
     a => a.name.toLowerCase().includes(search.toLowerCase()) ||
-         a.businessDomain.toLowerCase().includes(search.toLowerCase())
+         a.business_domain.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDelete = (agent: Agent) => {
+  const handleDelete = (agent: AgentRow) => {
     if (!hasPermission('write')) return;
-    
-    auditLogs.create({
-      workspaceId: workspace.id,
-      actorEmail: user?.email || '',
-      actionType: 'delete',
-      entityType: 'agent',
-      entityId: agent.id,
-      before: { id: agent.id, name: agent.name },
-      after: null,
-    });
-    
-    agents.delete(agent.id);
-    toast({
-      title: 'Agent deleted',
-      description: `${agent.name} has been removed.`,
-    });
-    // Force re-render
-    setSearch(s => s + ' ');
-    setSearch(s => s.trim());
+    deleteAgent.mutate(agent.id);
   };
 
-  const getChannelIcons = (agent: Agent) => {
+  const getChannelIcons = (agent: AgentRow) => {
     const icons = [];
-    if (agent.channels.webChat) icons.push(<MessageSquare key="web" className="w-3 h-3" />);
-    if (agent.channels.phone) icons.push(<Phone key="phone" className="w-3 h-3" />);
-    if (agent.channels.sms) icons.push(<Mail key="sms" className="w-3 h-3" />);
+    const channels = agent.channels as { webChat?: boolean; phone?: boolean; sms?: boolean; whatsapp?: boolean };
+    if (channels?.webChat) icons.push(<MessageSquare key="web" className="w-3 h-3" />);
+    if (channels?.phone) icons.push(<Phone key="phone" className="w-3 h-3" />);
+    if (channels?.sms) icons.push(<Mail key="sms" className="w-3 h-3" />);
     return icons;
   };
+
+  const getPersonaName = (personaId: string | null) => {
+    if (!personaId) return null;
+    const persona = personas.find(p => p.id === personaId);
+    return persona?.name;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-10 w-80" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-48" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -120,7 +131,7 @@ const AgentsList: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredAgents.map((agent) => {
-            const persona = agent.personaId ? personas.getById(agent.personaId) : null;
+            const personaName = getPersonaName(agent.persona_id);
             return (
               <Card
                 key={agent.id}
@@ -128,7 +139,7 @@ const AgentsList: React.FC = () => {
                 onClick={() => navigate(`/dashboard/agents/${agent.id}`)}
               >
                 <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start justify-between mb-4">
                     <div className={`p-3 rounded-lg ${
                       agent.status === 'live' ? 'bg-success/10' : 'bg-secondary'
                     }`}>
@@ -178,12 +189,12 @@ const AgentsList: React.FC = () => {
                     {agent.name}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-3 capitalize">
-                    {agent.businessDomain}
+                    {agent.business_domain}
                   </p>
                   
-                  {persona && (
+                  {personaName && (
                     <p className="text-xs text-muted-foreground mb-4">
-                      Persona: {persona.name}
+                      Persona: {personaName}
                     </p>
                   )}
 
@@ -192,7 +203,7 @@ const AgentsList: React.FC = () => {
                       {getChannelIcons(agent)}
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {agent.knowledgeSourceIds.length} knowledge sources
+                      {agent.knowledge_source_ids?.length || 0} knowledge sources
                     </span>
                   </div>
                 </CardContent>

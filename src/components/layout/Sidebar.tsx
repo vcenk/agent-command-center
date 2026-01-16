@@ -20,6 +20,7 @@ import {
   LayoutTemplate,
   Inbox,
   UserCheck,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,6 +46,7 @@ const navGroups: NavGroup[] = [
     name: 'Overview',
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
     ],
   },
   {

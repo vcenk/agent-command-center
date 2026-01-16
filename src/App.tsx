@@ -34,6 +34,8 @@ import TestChatPage from "./pages/dashboard/TestChatPage";
 import SessionsList from "./pages/dashboard/sessions/SessionsList";
 import SessionDetail from "./pages/dashboard/sessions/SessionDetail";
 import LeadsPage from "./pages/dashboard/leads/LeadsPage";
+import BillingPage from "./pages/dashboard/BillingPage";
+import AnalyticsPage from "./pages/dashboard/AnalyticsPage";
 
 const queryClient = new QueryClient();
 
@@ -79,10 +81,11 @@ const App = () => (
               <Route path="leads" element={<LeadsPage />} />
               <Route path="calls" element={<CallsList />} />
               <Route path="calls/:id" element={<CallDetail />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="integrations" element={<ComingSoon title="Integrations" />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="audit-logs" element={<AuditLogsPage />} />
-              <Route path="billing" element={<ComingSoon title="Billing" />} />
+              <Route path="billing" element={<BillingPage />} />
             </Route>
             <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<NotFound />} />

@@ -11,8 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
 import {
-  ArrowLeft,
   Bot,
   Rocket,
   MessageSquare,
@@ -140,12 +140,17 @@ const AgentDetail: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumbs */}
+      <Breadcrumbs
+        items={[
+          { label: 'Agents', href: '/dashboard/agents' },
+          { label: agent.name },
+        ]}
+      />
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/agents')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
           <div className={`p-3 rounded-lg ${agent.status === 'live' ? 'bg-success/10' : 'bg-secondary'}`}>
             <Bot className={`w-8 h-8 ${agent.status === 'live' ? 'text-success' : 'text-muted-foreground'}`} />
           </div>

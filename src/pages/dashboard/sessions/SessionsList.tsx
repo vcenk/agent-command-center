@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { MessageSquare, Filter } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -55,10 +56,10 @@ const SessionsList: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Sessions</h1>
-        <p className="text-muted-foreground mt-1">View and manage chat conversations</p>
-      </div>
+      <PageHeader
+        title="Sessions"
+        description="View and manage chat conversations"
+      />
 
       {/* Filters */}
       <Card>

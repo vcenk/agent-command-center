@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import {
   Bot,
   Plus,
@@ -30,7 +32,9 @@ const AgentsList: React.FC = () => {
   const { workspace, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [agentToDelete, setAgentToDelete] = useState<AgentRow | null>(null);
+
   const { data: agents = [], isLoading } = useAgents();
   const { data: personas = [] } = usePersonas();
   const deleteAgent = useDeleteAgent();
@@ -42,9 +46,19 @@ const AgentsList: React.FC = () => {
          a.business_domain.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDelete = (agent: AgentRow) => {
-    if (!hasPermission('write')) return;
-    deleteAgent.mutate(agent.id);
+  const handleDeleteClick = (agent: AgentRow) => {
+    setAgentToDelete(agent);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!agentToDelete || !hasPermission('write')) return;
+    deleteAgent.mutate(agentToDelete.id, {
+      onSuccess: () => {
+        setDeleteDialogOpen(false);
+        setAgentToDelete(null);
+      },
+    });
   };
 
   const getChannelIcons = (agent: AgentRow) => {
@@ -85,20 +99,18 @@ const AgentsList: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Agents</h1>
-          <p className="text-muted-foreground">
-            Manage your AI agents and their configurations
-          </p>
-        </div>
-        {hasPermission('write') && (
-          <Button variant="glow" onClick={() => navigate('/dashboard/agents/new')}>
-            <Plus className="w-4 h-4" />
-            Create Agent
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Agents"
+        description="Manage your AI agents and their configurations"
+        action={
+          hasPermission('write') && (
+            <Button variant="glow" onClick={() => navigate('/dashboard/agents/new')}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Agent
+            </Button>
+          )
+        }
+      />
 
       {/* Search */}
       <div className="relative max-w-md">
@@ -169,11 +181,11 @@ const AgentsList: React.FC = () => {
                               <Pencil className="w-4 h-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-destructive"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDelete(agent);
+                                handleDeleteClick(agent);
                               }}
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
@@ -212,6 +224,18 @@ const AgentsList: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Agent"
+        description={`Are you sure you want to delete "${agentToDelete?.name}"? This action cannot be undone and will remove all associated data.`}
+        confirmText="Delete Agent"
+        variant="destructive"
+        isLoading={deleteAgent.isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 };

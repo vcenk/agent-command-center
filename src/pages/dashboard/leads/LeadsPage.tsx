@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Copy, Download, Mail, Phone, ExternalLink, Search } from 'lucide-react';
+import { Copy, Download, Mail, ExternalLink, Search } from 'lucide-react';
 import { useLeads, LeadFilters } from '@/hooks/useLeads';
 import { useAgents } from '@/hooks/useAgents';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { toast } from 'sonner';
 
 const LeadsPage = () => {
@@ -80,16 +81,16 @@ const LeadsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Leads</h1>
-          <p className="text-muted-foreground">Captured contact information from chat sessions</p>
-        </div>
-        <Button onClick={exportCSV} variant="outline" className="gap-2">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        title="Leads"
+        description="Captured contact information from chat sessions"
+        action={
+          <Button onClick={exportCSV} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <Card>

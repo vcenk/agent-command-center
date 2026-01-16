@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Bot, Clock, MessageSquare, ExternalLink, Save, Mail, Phone, User } from 'lucide-react';
+import { Breadcrumbs } from '@/components/shared/Breadcrumbs';
+import { Bot, Clock, MessageSquare, ExternalLink, Save, Mail, Phone, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -74,15 +75,20 @@ const SessionDetail: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumbs */}
+      <Breadcrumbs
+        items={[
+          { label: 'Sessions', href: '/dashboard/sessions' },
+          { label: `Session ${session.session_id.substring(0, 8)}...` },
+        ]}
+      />
+
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/sessions')}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div className="flex-1">
+      <div className="flex items-center justify-between">
+        <div>
           <h1 className="text-2xl font-bold text-foreground">Session Details</h1>
           <p className="text-muted-foreground text-sm">
-            {session.session_id.substring(0, 8)}...
+            {session.agents?.name || 'Unknown Agent'} · {session.session_id.substring(0, 8)}...
           </p>
         </div>
         <Button

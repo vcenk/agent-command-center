@@ -8,20 +8,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import { PageHeader } from '@/components/shared/PageHeader';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { 
-  Plus, 
-  Search, 
-  FileText, 
-  Link as LinkIcon, 
-  Type, 
-  MoreHorizontal, 
-  Eye, 
+import {
+  Plus,
+  Search,
+  FileText,
+  Link as LinkIcon,
+  Type,
+  MoreHorizontal,
+  Eye,
   Trash2,
   Database
 } from 'lucide-react';
@@ -103,20 +104,18 @@ const KnowledgeList: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Knowledge Base</h1>
-          <p className="text-muted-foreground">
-            Manage knowledge sources for your AI agents
-          </p>
-        </div>
-        {canEdit && (
-          <Button onClick={() => navigate('/dashboard/knowledge/new')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Knowledge
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Knowledge Base"
+        description="Manage knowledge sources for your AI agents"
+        action={
+          canEdit && (
+            <Button onClick={() => navigate('/dashboard/knowledge/new')}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Knowledge
+            </Button>
+          )
+        }
+      />
 
       {/* Filters */}
       <div className="flex gap-4">

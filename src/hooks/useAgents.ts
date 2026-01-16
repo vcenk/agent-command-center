@@ -19,6 +19,9 @@ export interface AgentRow {
   allowed_actions: string[] | null;
   knowledge_source_ids: string[] | null;
   status: 'draft' | 'live';
+  llm_model_id: string | null;
+  llm_temperature: number | null;
+  llm_max_tokens: number | null;
   created_at: string;
   updated_at: string;
 }

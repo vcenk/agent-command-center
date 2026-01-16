@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import NoAccess from "./pages/NoAccess";
 import NotFound from "./pages/NotFound";
+import LandingPage from "./pages/landing/LandingPage";
 import Overview from "./pages/dashboard/Overview";
 import AgentsList from "./pages/dashboard/agents/AgentsList";
 import AgentForm from "./pages/dashboard/agents/AgentForm";
@@ -83,7 +84,7 @@ const App = () => (
               <Route path="audit-logs" element={<AuditLogsPage />} />
               <Route path="billing" element={<ComingSoon title="Billing" />} />
             </Route>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<LandingPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

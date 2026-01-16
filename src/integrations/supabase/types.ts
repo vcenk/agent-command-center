@@ -72,6 +72,9 @@ export type Database = {
           status: Database["public"]["Enums"]["agent_status"]
           updated_at: string
           workspace_id: string
+          llm_model_id: string | null
+          llm_temperature: number | null
+          llm_max_tokens: number | null
         }
         Insert: {
           allowed_actions?: string[] | null
@@ -86,6 +89,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["agent_status"]
           updated_at?: string
           workspace_id: string
+          llm_model_id?: string | null
+          llm_temperature?: number | null
+          llm_max_tokens?: number | null
         }
         Update: {
           allowed_actions?: string[] | null
@@ -100,6 +106,9 @@ export type Database = {
           status?: Database["public"]["Enums"]["agent_status"]
           updated_at?: string
           workspace_id?: string
+          llm_model_id?: string | null
+          llm_temperature?: number | null
+          llm_max_tokens?: number | null
         }
         Relationships: [
           {
@@ -527,6 +536,101 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_models: {
+        Row: {
+          id: string
+          provider: Database["public"]["Enums"]["llm_provider"]
+          model_id: string
+          display_name: string
+          description: string | null
+          context_window: number
+          max_output_tokens: number
+          supports_vision: boolean
+          supports_function_calling: boolean
+          cost_per_1k_input: number | null
+          cost_per_1k_output: number | null
+          is_default: boolean
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          provider: Database["public"]["Enums"]["llm_provider"]
+          model_id: string
+          display_name: string
+          description?: string | null
+          context_window?: number
+          max_output_tokens?: number
+          supports_vision?: boolean
+          supports_function_calling?: boolean
+          cost_per_1k_input?: number | null
+          cost_per_1k_output?: number | null
+          is_default?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          provider?: Database["public"]["Enums"]["llm_provider"]
+          model_id?: string
+          display_name?: string
+          description?: string | null
+          context_window?: number
+          max_output_tokens?: number
+          supports_vision?: boolean
+          supports_function_calling?: boolean
+          cost_per_1k_input?: number | null
+          cost_per_1k_output?: number | null
+          is_default?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      workspace_llm_config: {
+        Row: {
+          id: string
+          workspace_id: string
+          provider: Database["public"]["Enums"]["llm_provider"]
+          api_key_encrypted: string | null
+          base_url: string | null
+          is_enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          provider: Database["public"]["Enums"]["llm_provider"]
+          api_key_encrypted?: string | null
+          base_url?: string | null
+          is_enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          provider?: Database["public"]["Enums"]["llm_provider"]
+          api_key_encrypted?: string | null
+          base_url?: string | null
+          is_enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_llm_config_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -562,6 +666,7 @@ export type Database = {
       fallback_policy: "apologize" | "escalate" | "retry" | "transfer"
       knowledge_type: "PDF" | "URL" | "TEXT"
       persona_tone: "professional" | "friendly" | "casual" | "formal"
+      llm_provider: "openai" | "anthropic" | "google" | "mistral" | "groq" | "together" | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -702,6 +807,7 @@ export const Constants = {
       fallback_policy: ["apologize", "escalate", "retry", "transfer"],
       knowledge_type: ["PDF", "URL", "TEXT"],
       persona_tone: ["professional", "friendly", "casual", "formal"],
+      llm_provider: ["openai", "anthropic", "google", "mistral", "groq", "together", "custom"],
     },
   },
 } as const

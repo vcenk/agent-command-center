@@ -1,11 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
 @layer base {
   :root {
+    /* Light theme (default) */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 200 85% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 200 85% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 200 85% 45%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 220 14% 98%;
+    --sidebar-foreground: 220 9% 46%;
+    --sidebar-primary: 200 85% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 200 85% 45%;
+
+    /* Custom tokens */
+    --glow-primary: 200 85% 45%;
+    --gradient-primary: linear-gradient(135deg, hsl(200 85% 45%) 0%, hsl(210 85% 40%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(220 14% 98%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
+
+    --shadow-glow: 0 0 40px hsl(200 85% 45% / 0.15);
+    --shadow-card: 0 4px 24px hsl(220 13% 91% / 0.5);
+    --shadow-elevated: 0 8px 32px hsl(220 13% 91% / 0.7);
+  }
+
+  .dark {
+    /* Dark theme */
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
 
@@ -40,8 +99,6 @@
     --input: 217 33% 17%;
     --ring: 187 85% 53%;
 
-    --radius: 0.5rem;
-
     --sidebar-background: 222 47% 5%;
     --sidebar-foreground: 215 20% 65%;
     --sidebar-primary: 187 85% 53%;
@@ -56,7 +113,7 @@
     --gradient-primary: linear-gradient(135deg, hsl(187 85% 53%) 0%, hsl(200 85% 45%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(222 47% 8%) 0%, hsl(222 47% 6%) 100%);
     --gradient-card: linear-gradient(135deg, hsl(222 47% 10%) 0%, hsl(222 47% 8%) 100%);
-    
+
     --shadow-glow: 0 0 40px hsl(187 85% 53% / 0.15);
     --shadow-card: 0 4px 24px hsl(222 47% 2% / 0.4);
     --shadow-elevated: 0 8px 32px hsl(222 47% 2% / 0.6);

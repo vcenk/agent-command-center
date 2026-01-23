@@ -172,6 +172,90 @@ export const knowledgeApi = {
 };
 
 // =====================================================
+// INTEGRATIONS API
+// =====================================================
+
+export interface Integration {
+  id?: string;
+  provider: string;
+  status: 'pending' | 'connected' | 'error' | 'disconnected';
+  config?: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  connected_at: string | null;
+  error_message?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const integrationsApi = {
+  list: () => request<Integration[]>('/integrations'),
+
+  get: (provider: string) => request<Integration>(`/integrations/${provider}`),
+
+  connect: (provider: string) =>
+    request<{ authorizeUrl: string }>(`/integrations/${provider}/connect`, { method: 'POST', body: {} }),
+
+  updateSettings: (provider: string, settings: Record<string, unknown>) =>
+    request<Integration>(`/integrations/${provider}/settings`, { method: 'PATCH', body: { settings } }),
+
+  disconnect: (provider: string) =>
+    request<{ success: boolean }>(`/integrations/${provider}`, { method: 'DELETE' }),
+};
+
+// =====================================================
+// CALENDAR API
+// =====================================================
+
+export interface CalendarSlot {
+  start: string;
+  end: string;
+}
+
+export interface CalendarBooking {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  attendeeEmail: string;
+  calendarEventCreated: boolean;
+}
+
+export const calendarApi = {
+  getAvailability: (workspaceId: string, date: string, agentId?: string) =>
+    request<{ slots: CalendarSlot[]; source: string }>(
+      `/calendar/availability?workspaceId=${workspaceId}&date=${date}${agentId ? `&agentId=${agentId}` : ''}`
+    ),
+
+  book: (data: {
+    workspaceId: string;
+    agentId: string;
+    sessionId: string;
+    startTime: string;
+    endTime?: string;
+    title?: string;
+    description?: string;
+    attendeeName?: string;
+    attendeeEmail: string;
+    attendeePhone?: string;
+  }) => request<{ success: boolean; booking: CalendarBooking }>('/calendar/book', { method: 'POST', body: data }),
+
+  cancel: (bookingId: string) =>
+    request<{ success: boolean }>(`/calendar/bookings/${bookingId}`, { method: 'DELETE' }),
+};
+
+// =====================================================
+// Generic Secure API Client
+// =====================================================
+
+export const secureApi = {
+  get: <T>(endpoint: string) => request<T>(endpoint, { method: 'GET' }),
+  post: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: 'POST', body }),
+  put: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: 'PUT', body }),
+  patch: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: 'PATCH', body }),
+  delete: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
+};
+
+// =====================================================
 // Export all APIs
 // =====================================================
 
@@ -179,6 +263,8 @@ export const api = {
   agents: agentsApi,
   personas: personasApi,
   knowledge: knowledgeApi,
+  integrations: integrationsApi,
+  calendar: calendarApi,
 };
 
 export { ApiError };

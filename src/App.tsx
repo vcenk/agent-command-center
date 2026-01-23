@@ -18,6 +18,7 @@ import AgentForm from "./pages/dashboard/agents/AgentForm";
 import AgentDetail from "./pages/dashboard/agents/AgentDetail";
 import AgentInstall from "./pages/dashboard/agents/AgentInstall";
 import AgentReview from "./pages/dashboard/agents/AgentReview";
+import AgentTools from "./pages/dashboard/agents/AgentTools";
 import PersonasList from "./pages/dashboard/personas/PersonasList";
 import PersonaForm from "./pages/dashboard/personas/PersonaForm";
 import PersonaDetail from "./pages/dashboard/personas/PersonaDetail";
@@ -36,6 +37,9 @@ import SessionDetail from "./pages/dashboard/sessions/SessionDetail";
 import LeadsPage from "./pages/dashboard/leads/LeadsPage";
 import BillingPage from "./pages/dashboard/BillingPage";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage";
+import IntegrationsPage from "./pages/dashboard/integrations/IntegrationsPage";
+import SlackSetup from "./pages/dashboard/integrations/SlackSetup";
+import GoogleCalendarSetup from "./pages/dashboard/integrations/GoogleCalendarSetup";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +71,7 @@ const App = () => (
               <Route path="agents/:id/edit" element={<AgentForm />} />
               <Route path="agents/:id/install" element={<AgentInstall />} />
               <Route path="agents/:id/review" element={<AgentReview />} />
+              <Route path="agents/:id/tools" element={<AgentTools />} />
               <Route path="personas" element={<PersonasList />} />
               <Route path="personas/new" element={<PersonaForm />} />
               <Route path="personas/:id" element={<PersonaDetail />} />
@@ -82,7 +87,9 @@ const App = () => (
               <Route path="calls" element={<CallsList />} />
               <Route path="calls/:id" element={<CallDetail />} />
               <Route path="analytics" element={<AnalyticsPage />} />
-              <Route path="integrations" element={<ComingSoon title="Integrations" />} />
+              <Route path="integrations" element={<IntegrationsPage />} />
+              <Route path="integrations/slack" element={<SlackSetup />} />
+              <Route path="integrations/calendar" element={<GoogleCalendarSetup />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="audit-logs" element={<AuditLogsPage />} />
               <Route path="billing" element={<BillingPage />} />

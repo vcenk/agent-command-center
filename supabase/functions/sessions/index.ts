@@ -9,6 +9,20 @@ import {
   errorResponse,
   corsHeaders,
 } from '../_shared/auth.ts'
+import {
+  SessionCreateSchema,
+  SessionUpdateSchema,
+  UUIDSchema,
+  SESSION_ALLOWED_UPDATE_FIELDS,
+  filterAllowedFields,
+  validationErrorResponse,
+} from '../_shared/schemas.ts'
+import {
+  rateLimit,
+  rateLimitByUser,
+  RATE_LIMITS,
+} from '../_shared/ratelimit.ts'
+import { ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -23,6 +37,14 @@ serve(async (req: Request) => {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/').filter(Boolean)
     const sessionId = pathParts[1]
+
+    // Validate session ID format if provided
+    if (sessionId) {
+      const idValidation = UUIDSchema.safeParse(sessionId)
+      if (!idValidation.success) {
+        return errorResponse('Invalid session ID format', 400)
+      }
+    }
 
     // Check if request is from authenticated user or widget
     const authHeader = req.headers.get('Authorization')
@@ -71,16 +93,34 @@ serve(async (req: Request) => {
           if (error || !data) return errorResponse('Session not found', 404)
           return jsonResponse(data)
         } else {
-          // List all sessions
-          const limit = parseInt(url.searchParams.get('limit') || '50')
-          const offset = parseInt(url.searchParams.get('offset') || '0')
+          // List all sessions with pagination and filters
+          const limitParam = url.searchParams.get('limit')
+          const offsetParam = url.searchParams.get('offset')
+          const agentId = url.searchParams.get('agentId')
+          const status = url.searchParams.get('status')
+          const channel = url.searchParams.get('channel')
 
-          const { data, error } = await db
+          const limit = Math.min(Math.max(parseInt(limitParam || '50') || 50, 1), 100)
+          const offset = Math.max(parseInt(offsetParam || '0') || 0, 0)
+
+          let query = db
             .from('chat_sessions')
-            .select('*')
+            .select('*, agents(id, name)')
             .eq('workspace_id', workspaceId)
-            .order('created_at', { ascending: false })
+            .order('updated_at', { ascending: false })
             .range(offset, offset + limit - 1)
+
+          if (agentId && agentId !== 'all') {
+            query = query.eq('agent_id', agentId)
+          }
+          if (status && status !== 'all') {
+            query = query.eq('status', status)
+          }
+          if (channel && channel !== 'all') {
+            query = query.eq('channel', channel)
+          }
+
+          const { data, error } = await query
 
           if (error) return errorResponse(error.message, 500)
           return jsonResponse(data)
@@ -88,18 +128,28 @@ serve(async (req: Request) => {
       }
 
       case 'POST': {
+        // Rate limit session creation - by IP for anonymous requests
+        const rateLimitResult = rateLimit(req, 'session_create', RATE_LIMITS.SESSION_CREATE)
+        if (rateLimitResult) {
+          return rateLimitResult
+        }
+
         // Create session - can be from widget (anonymous) or dashboard
         const body = await req.json()
 
-        if (!body.agent_id || !body.session_id) {
-          return errorResponse('agent_id and session_id are required', 400)
+        // Validate input
+        const validation = SessionCreateSchema.safeParse(body)
+        if (!validation.success) {
+          return validationErrorResponse(validation.error)
         }
+
+        const validatedData = validation.data
 
         // Get agent to verify it exists and get workspace
         const { data: agent } = await db
           .from('agents')
           .select('workspace_id, status')
-          .eq('id', body.agent_id)
+          .eq('id', validatedData.agent_id)
           .single()
 
         if (!agent) {
@@ -115,11 +165,12 @@ serve(async (req: Request) => {
           .from('chat_sessions')
           .insert({
             workspace_id: agent.workspace_id,
-            agent_id: body.agent_id,
-            session_id: body.session_id,
-            channel: body.channel || 'web',
+            agent_id: validatedData.agent_id,
+            session_id: validatedData.session_id,
+            channel: validatedData.channel,
             status: 'active',
-            messages: body.messages || [],
+            messages: [],
+            metadata: validatedData.metadata || {},
           })
           .select()
           .single()
@@ -135,6 +186,12 @@ serve(async (req: Request) => {
         }
 
         const body = await req.json()
+
+        // Validate input
+        const validation = SessionUpdateSchema.safeParse(body)
+        if (!validation.success) {
+          return validationErrorResponse(validation.error)
+        }
 
         // Get existing session
         const { data: existing } = await db
@@ -152,26 +209,37 @@ serve(async (req: Request) => {
           return errorResponse('Access denied', 403)
         }
 
-        // Build update object
-        const updates: Record<string, unknown> = {}
+        // Build update object with explicit field handling
+        const updates: Record<string, unknown> = {
+          updated_at: new Date().toISOString(),
+        }
 
-        if (body.messages) {
-          // Append new messages
-          updates.messages = [...(existing.messages as unknown[]), ...body.messages]
-          updates.last_message = body.messages[body.messages.length - 1]?.content
+        const validatedData = validation.data
+
+        if (validatedData.messages && validatedData.messages.length > 0) {
+          // Append new messages (with validation already done)
+          const existingMessages = Array.isArray(existing.messages) ? existing.messages : []
+          updates.messages = [...existingMessages, ...validatedData.messages]
+          updates.last_message = validatedData.messages[validatedData.messages.length - 1]?.content
           updates.last_message_at = new Date().toISOString()
         }
 
-        if (body.status) {
-          updates.status = body.status
-          if (body.status === 'ended') {
+        if (validatedData.status) {
+          updates.status = validatedData.status
+          if (validatedData.status === 'completed' || validatedData.status === 'abandoned') {
             updates.ended_at = new Date().toISOString()
           }
         }
 
-        if (body.summary) updates.summary = body.summary
-        if (body.internal_note) updates.internal_note = body.internal_note
-        if (body.lead_captured !== undefined) updates.lead_captured = body.lead_captured
+        if (validatedData.summary !== undefined) {
+          updates.summary = validatedData.summary
+        }
+        if (validatedData.internal_note !== undefined) {
+          updates.internal_note = validatedData.internal_note
+        }
+        if (validatedData.lead_captured !== undefined) {
+          updates.lead_captured = validatedData.lead_captured
+        }
 
         const { data, error } = await db
           .from('chat_sessions')
@@ -188,6 +256,9 @@ serve(async (req: Request) => {
         return errorResponse('Method not allowed', 405)
     }
   } catch (err) {
+    if (err instanceof ZodError) {
+      return validationErrorResponse(err)
+    }
     console.error('Edge function error:', err)
     return errorResponse('Internal server error', 500)
   }

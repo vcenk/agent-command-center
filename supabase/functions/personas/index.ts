@@ -11,6 +11,15 @@ import {
   corsHeaders,
   AuthResult,
 } from '../_shared/auth.ts'
+import {
+  PersonaCreateSchema,
+  PersonaUpdateSchema,
+  UUIDSchema,
+  PERSONA_ALLOWED_UPDATE_FIELDS,
+  filterAllowedFields,
+  validationErrorResponse,
+} from '../_shared/schemas.ts'
+import { ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -30,6 +39,14 @@ serve(async (req: Request) => {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/').filter(Boolean)
     const personaId = pathParts[1]
+
+    // Validate persona ID if provided
+    if (personaId) {
+      const idValidation = UUIDSchema.safeParse(personaId)
+      if (!idValidation.success) {
+        return errorResponse('Invalid persona ID format', 400)
+      }
+    }
 
     const db = getAdminClient()
 
@@ -63,13 +80,28 @@ serve(async (req: Request) => {
         }
 
         const body = await req.json()
-        if (!body.name || !body.role_title) {
-          return errorResponse('Name and role_title are required', 400)
+
+        // Validate input
+        const validation = PersonaCreateSchema.safeParse(body)
+        if (!validation.success) {
+          return validationErrorResponse(validation.error)
         }
+
+        const validatedData = validation.data
 
         const { data, error } = await db
           .from('personas')
-          .insert({ ...body, workspace_id: workspaceId })
+          .insert({
+            name: validatedData.name,
+            role_title: validatedData.role_title,
+            tone: validatedData.tone,
+            greeting: validatedData.greeting,
+            style_notes: validatedData.style_notes,
+            fallback_message: validatedData.fallback_message,
+            escalation_policy: validatedData.escalation_policy,
+            guardrails: validatedData.guardrails,
+            workspace_id: workspaceId,
+          })
           .select()
           .single()
 
@@ -86,13 +118,29 @@ serve(async (req: Request) => {
         if (!personaId) return errorResponse('Persona ID required', 400)
 
         const body = await req.json()
-        delete body.id
-        delete body.workspace_id
-        delete body.created_at
+
+        // Validate input
+        const validation = PersonaUpdateSchema.safeParse(body)
+        if (!validation.success) {
+          return validationErrorResponse(validation.error)
+        }
+
+        // Filter to only allowed fields
+        const filteredData = filterAllowedFields(
+          validation.data,
+          PERSONA_ALLOWED_UPDATE_FIELDS
+        )
+
+        if (Object.keys(filteredData).length === 0) {
+          return errorResponse('No valid fields to update', 400)
+        }
 
         const { data, error } = await db
           .from('personas')
-          .update(body)
+          .update({
+            ...filteredData,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', personaId)
           .eq('workspace_id', workspaceId)
           .select()
@@ -124,6 +172,9 @@ serve(async (req: Request) => {
         return errorResponse('Method not allowed', 405)
     }
   } catch (err) {
+    if (err instanceof ZodError) {
+      return validationErrorResponse(err)
+    }
     console.error('Edge function error:', err)
     return errorResponse('Internal server error', 500)
   }

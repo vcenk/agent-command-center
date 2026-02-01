@@ -1,10 +1,67 @@
 project_id = "ehvcrdooykxmcpcopuxz"
 
+# Disable gateway JWT verification - functions handle their own auth
+# This is needed because the gateway uses a different validation than auth.getUser()
+
+[functions.agents]
+verify_jwt = false
+
+[functions.analytics]
+verify_jwt = false
+
+[functions.billing]
+verify_jwt = false
+
+[functions.calendar]
+verify_jwt = false
+
+[functions.channel-configs]
+verify_jwt = false
+
 [functions.chat]
+verify_jwt = false
+
+[functions.generate-embeddings]
+verify_jwt = false
+
+[functions.integrations]
+verify_jwt = false
+
+[functions.knowledge]
+verify_jwt = false
+
+[functions.leads]
 verify_jwt = false
 
 [functions.log-chat-session]
 verify_jwt = false
 
+[functions.personas]
+verify_jwt = false
+
+[functions.sessions]
+verify_jwt = false
+
+[functions.slack]
+verify_jwt = false
+
+[functions.stripe-checkout]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.tools]
+verify_jwt = false
+
+[functions.widget]
+verify_jwt = false
+
 [functions.widget-config]
+verify_jwt = false
+
+[functions.voice]
+verify_jwt = false
+
+[functions.workspaces]
 verify_jwt = false

@@ -156,7 +156,7 @@ const SessionDetail: React.FC = () => {
                   className="flex items-center gap-1 text-sm text-primary hover:underline"
                 >
                   <Bot className="w-3 h-3" />
-                  {(session as any).agents?.name || 'Unknown'}
+                  {(session as { agents?: { name?: string } }).agents?.name || 'Unknown'}
                   <ExternalLink className="w-3 h-3" />
                 </Link>
               </div>

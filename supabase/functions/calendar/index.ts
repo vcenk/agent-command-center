@@ -45,8 +45,41 @@ function htmlRedirect(url: string) {
   })
 }
 
+// Types for Supabase client and integration
+interface SupabaseClient {
+  from: (table: string) => {
+    select: (columns?: string) => { eq: (col: string, val: string) => { single: () => Promise<{ data: unknown; error: unknown }> } };
+    update: (data: Record<string, unknown>) => { eq: (col: string, val: string) => Promise<{ error: unknown }> };
+    insert: (data: Record<string, unknown>) => { select: () => { single: () => Promise<{ data: unknown; error: unknown }> } };
+    delete: () => { eq: (col: string, val: string) => Promise<{ error: unknown }> };
+  };
+}
+
+interface IntegrationConfig {
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: string;
+  calendar_id?: string;
+  [key: string]: unknown;
+}
+
+interface Integration {
+  id: string;
+  workspace_id: string;
+  provider: string;
+  status: string;
+  config: IntegrationConfig;
+  settings: Record<string, unknown>;
+}
+
+interface CalendarItem {
+  id: string;
+  summary: string;
+  primary?: boolean;
+}
+
 // Refresh Google OAuth token if expired
-async function refreshGoogleToken(db: any, integration: any): Promise<string | null> {
+async function refreshGoogleToken(db: SupabaseClient, integration: Integration): Promise<string | null> {
   const { config } = integration
 
   // Check if token is still valid
@@ -244,7 +277,7 @@ serve(async (req: Request) => {
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-        available_calendars: calendarsData.items?.map((c: any) => ({
+        available_calendars: calendarsData.items?.map((c: CalendarItem) => ({
           id: c.id,
           summary: c.summary,
           primary: c.primary,
@@ -253,8 +286,8 @@ serve(async (req: Request) => {
 
       // Default settings
       const settings = {
-        calendar_id: calendarsData.items?.find((c: any) => c.primary)?.id || 'primary',
-        calendar_name: calendarsData.items?.find((c: any) => c.primary)?.summary || 'Primary',
+        calendar_id: calendarsData.items?.find((c: CalendarItem) => c.primary)?.id || 'primary',
+        calendar_name: calendarsData.items?.find((c: CalendarItem) => c.primary)?.summary || 'Primary',
         business_hours_start: '09:00',
         business_hours_end: '17:00',
         slot_duration_minutes: 30,
@@ -362,8 +395,8 @@ serve(async (req: Request) => {
         .in('status', ['pending', 'confirmed'])
 
       const allBusySlots = [
-        ...busySlots.map((b: any) => ({ start: new Date(b.start), end: new Date(b.end) })),
-        ...(existingBookings || []).map((b: any) => ({
+        ...busySlots.map((b: { start: string; end: string }) => ({ start: new Date(b.start), end: new Date(b.end) })),
+        ...(existingBookings || []).map((b: { start_time: string; end_time: string }) => ({
           start: new Date(b.start_time),
           end: new Date(b.end_time),
         })),

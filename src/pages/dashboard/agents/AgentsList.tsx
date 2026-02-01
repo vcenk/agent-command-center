@@ -6,10 +6,11 @@ import { usePersonas } from '@/hooks/usePersonas';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PageSkeleton } from '@/components/shared/LoadingSkeleton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { AgentStatusBadge } from '@/components/shared/StatusBadge';
+import { EmptyState } from '@/components/shared/EmptyState';
 import {
   Bot,
   Plus,
@@ -77,23 +78,7 @@ const AgentsList: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between">
-          <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <Skeleton className="h-10 w-80" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-48" />
-          ))}
-        </div>
-      </div>
-    );
+    return <PageSkeleton header headerAction content="cards" contentCount={3} columns={3} />;
   }
 
   return (
@@ -126,18 +111,18 @@ const AgentsList: React.FC = () => {
       {/* Agents Grid */}
       {filteredAgents.length === 0 ? (
         <Card className="glass border-border/50">
-          <CardContent className="py-16 text-center">
-            <Bot className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-lg font-medium text-foreground mb-2">No agents found</h3>
-            <p className="text-muted-foreground mb-6">
-              {search ? 'Try adjusting your search' : 'Create your first agent to get started'}
-            </p>
-            {hasPermission('write') && !search && (
-              <Button variant="outline" onClick={() => navigate('/dashboard/agents/new')}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Agent
-              </Button>
-            )}
+          <CardContent className="py-8">
+            <EmptyState
+              icon={Bot}
+              title="No agents found"
+              description={search ? 'Try adjusting your search' : 'Create your first agent to get started'}
+              action={hasPermission('write') && !search ? {
+                label: 'Create Agent',
+                onClick: () => navigate('/dashboard/agents/new'),
+                icon: Plus,
+                variant: 'outline',
+              } : undefined}
+            />
           </CardContent>
         </Card>
       ) : (
@@ -160,12 +145,7 @@ const AgentsList: React.FC = () => {
                       }`} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge 
-                        variant={agent.status === 'live' ? 'default' : 'secondary'}
-                        className={agent.status === 'live' ? 'bg-success text-success-foreground' : ''}
-                      >
-                        {agent.status === 'live' ? 'Live' : 'Draft'}
-                      </Badge>
+                      <AgentStatusBadge status={agent.status} />
                       {hasPermission('write') && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>

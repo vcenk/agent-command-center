@@ -16,15 +16,17 @@ serve(async (req) => {
     const url = new URL(req.url);
     const agentId = url.searchParams.get("agentId");
 
+    // Get environment variables
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
     if (!agentId) {
       return new Response(
         JSON.stringify({ error: "agentId is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -52,6 +54,11 @@ serve(async (req) => {
           position: "bottom-right",
           launcher_label: "Chat with us",
           primary_color: "#111827",
+          // Include API config for widget initialization
+          apiConfig: {
+            supabaseUrl: SUPABASE_URL,
+            anonKey: SUPABASE_ANON_KEY,
+          },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -74,6 +81,11 @@ serve(async (req) => {
         position: config.position,
         launcher_label: config.launcher_label,
         primary_color: config.primary_color,
+        // Include API config for widget initialization
+        apiConfig: {
+          supabaseUrl: SUPABASE_URL,
+          anonKey: SUPABASE_ANON_KEY,
+        },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

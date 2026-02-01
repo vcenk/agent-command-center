@@ -70,7 +70,7 @@ serve(async (req: Request) => {
     }
 
     // Get or create Stripe customer
-    let { data: subscription } = await db
+    const { data: subscription } = await db
       .from('workspace_subscriptions')
       .select('stripe_customer_id')
       .eq('workspace_id', workspaceId)

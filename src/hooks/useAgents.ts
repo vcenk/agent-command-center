@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { agentsApi, ApiError } from '@/lib/api';
 
 export interface AgentRow {
   id: string;
@@ -27,43 +27,32 @@ export interface AgentRow {
 }
 
 export function useAgents() {
-  const { workspace } = useAuth();
+  const { workspace, isAuthenticated } = useAuth();
   const workspaceId = workspace?.id;
 
   return useQuery({
     queryKey: ['agents', workspaceId],
     queryFn: async () => {
-      if (!workspaceId) return [];
-      
-      const { data, error } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      // Uses secure Edge Function - no direct DB access
+      const data = await agentsApi.list();
       return data as AgentRow[];
     },
-    enabled: !!workspaceId,
+    enabled: !!workspaceId && isAuthenticated,
   });
 }
 
 export function useAgent(id: string | undefined) {
+  const { isAuthenticated } = useAuth();
+
   return useQuery({
     queryKey: ['agent', id],
     queryFn: async () => {
       if (!id) return null;
-      
-      const { data, error } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (error) throw error;
+      // Uses secure Edge Function - no direct DB access
+      const data = await agentsApi.get(id);
       return data as AgentRow | null;
     },
-    enabled: !!id,
+    enabled: !!id && isAuthenticated,
   });
 }
 
@@ -75,25 +64,16 @@ export function useCreateAgent() {
   return useMutation({
     mutationFn: async (agent: Omit<AgentRow, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
       if (!workspace?.id) throw new Error('No workspace selected');
-
-      const { data, error } = await supabase
-        .from('agents')
-        .insert({
-          ...agent,
-          workspace_id: workspace.id,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // Uses secure Edge Function - workspace_id is set server-side from auth token
+      return await agentsApi.create(agent);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       toast({ title: 'Agent created', description: 'Your agent has been created successfully.' });
     },
     onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const message = error instanceof ApiError ? error.message : 'Failed to create agent';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 }
@@ -104,15 +84,8 @@ export function useUpdateAgent() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<AgentRow> & { id: string }) => {
-      const { data, error } = await supabase
-        .from('agents')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // Uses secure Edge Function - validates ownership server-side
+      return await agentsApi.update(id, updates);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
@@ -120,7 +93,8 @@ export function useUpdateAgent() {
       toast({ title: 'Agent updated', description: 'Your changes have been saved.' });
     },
     onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const message = error instanceof ApiError ? error.message : 'Failed to update agent';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 }
@@ -131,19 +105,16 @@ export function useDeleteAgent() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('agents')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      // Uses secure Edge Function - validates ownership server-side
+      await agentsApi.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       toast({ title: 'Agent deleted', description: 'The agent has been removed.' });
     },
     onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const message = error instanceof ApiError ? error.message : 'Failed to delete agent';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 }

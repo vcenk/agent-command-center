@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAgent } from '@/hooks/useAgents';
 import { useWidgetConfig, useCreateWidgetConfig, useUpdateWidgetConfig } from '@/hooks/useWidgetConfig';
@@ -12,8 +12,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Copy, Check, Plus, X, Globe, Paintbrush, Code, HelpCircle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
-const SUPABASE_URL = 'https://ehvcrdooykxmcpcopuxz.supabase.co';
-const WIDGET_URL = `${window.location.origin}/widget.js`;
+// Use environment variables for API configuration
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const WIDGET_URL = `${SUPABASE_URL}/functions/v1/widget`;
 
 const AgentInstall = () => {
   const { id } = useParams<{ id: string }>();
@@ -42,12 +43,19 @@ const AgentInstall = () => {
     }
   }, [config]);
 
+  // Memoized create config function
+  const handleCreateConfig = useCallback(() => {
+    if (id) {
+      createConfig.mutate(id);
+    }
+  }, [id, createConfig]);
+
   // Create config if it doesn't exist
   useEffect(() => {
     if (!configLoading && !config && id) {
-      createConfig.mutate(id);
+      handleCreateConfig();
     }
-  }, [configLoading, config, id]);
+  }, [configLoading, config, id, handleCreateConfig]);
 
   const embedSnippet = `<script src="${WIDGET_URL}" data-agent="${id}"></script>`;
 

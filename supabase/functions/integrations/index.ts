@@ -12,6 +12,14 @@ import {
   corsHeaders,
   AuthResult,
 } from '../_shared/auth.ts'
+import {
+  encryptOAuthConfig,
+  decryptOAuthConfig,
+} from '../_shared/crypto.ts'
+import {
+  rateLimit,
+  RATE_LIMITS,
+} from '../_shared/ratelimit.ts'
 
 // Supported integration providers
 const SUPPORTED_PROVIDERS = ['slack', 'google_calendar', 'hubspot', 'zapier'] as const
@@ -93,7 +101,7 @@ serve(async (req: Request) => {
         }
 
         // GET /integrations/:provider - Get specific integration
-        if (!SUPPORTED_PROVIDERS.includes(provider as any)) {
+        if (!SUPPORTED_PROVIDERS.includes(provider as Provider)) {
           return errorResponse(`Unknown provider: ${provider}`, 400)
         }
 
@@ -114,11 +122,17 @@ serve(async (req: Request) => {
       case 'POST': {
         // POST /integrations/:provider/connect - Start OAuth flow
         if (action === 'connect') {
+          // Rate limit OAuth connections
+          const rateLimitResult = rateLimit(req, 'oauth_connect', RATE_LIMITS.OAUTH_CONNECT, workspaceId)
+          if (rateLimitResult) {
+            return rateLimitResult
+          }
+
           if (!hasMinRole(role, 'MANAGER')) {
             return errorResponse('Manager role required to connect integrations', 403)
           }
 
-          if (!provider || !SUPPORTED_PROVIDERS.includes(provider as any)) {
+          if (!provider || !SUPPORTED_PROVIDERS.includes(provider as Provider)) {
             return errorResponse(`Unknown provider: ${provider}`, 400)
           }
 
@@ -229,29 +243,37 @@ serve(async (req: Request) => {
           }
 
           // Store tokens and mark as connected
-          const config: Record<string, unknown> = {
+          // Build config with tokens
+          const rawConfig: Record<string, unknown> = {
             access_token: tokenData.access_token,
           }
 
           if (tokenData.refresh_token) {
-            config.refresh_token = tokenData.refresh_token
+            rawConfig.refresh_token = tokenData.refresh_token
           }
           if (tokenData.expires_in) {
-            config.expires_at = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+            rawConfig.expires_at = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
           }
 
           // Provider-specific data
           if (provider === 'slack' && tokenData.team) {
-            config.team_id = tokenData.team.id
-            config.team_name = tokenData.team.name
-            config.bot_user_id = tokenData.bot_user_id
+            rawConfig.team_id = tokenData.team.id
+            rawConfig.team_name = tokenData.team.name
+            rawConfig.bot_user_id = tokenData.bot_user_id
           }
+
+          // Encrypt sensitive tokens before storing
+          const encryptedConfig = await encryptOAuthConfig(rawConfig as {
+            access_token?: string;
+            refresh_token?: string;
+            [key: string]: unknown;
+          })
 
           await db
             .from('workspace_integrations')
             .update({
               status: 'connected',
-              config,
+              config: encryptedConfig,
               connected_at: new Date().toISOString(),
               connected_by: user.id,
               error_message: null,

@@ -1,38 +1,55 @@
 (function() {
   'use strict';
 
-  // Get the script element and extract agent ID
+  // Get the script element and extract configuration
   const scriptTag = document.currentScript;
   const agentId = scriptTag?.getAttribute('data-agent');
-  
+  const apiUrl = scriptTag?.getAttribute('data-api-url');
+
   if (!agentId) {
     console.error('[Widget] Missing data-agent attribute');
     return;
   }
 
-  const SUPABASE_URL = 'https://ehvcrdooykxmcpcopuxz.supabase.co';
-  const CONFIG_ENDPOINT = `${SUPABASE_URL}/functions/v1/widget-config?agentId=${agentId}`;
-  const CHAT_ENDPOINT = `${SUPABASE_URL}/functions/v1/chat`;
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVodmNyZG9veWt4bWNwY29wdXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczODA0MDEsImV4cCI6MjA4Mjk1NjQwMX0.flymd8csmFzEM8jrPXZ7pylX78Yl_fKOnTOSxDp8k7I';
+  if (!apiUrl) {
+    console.error('[Widget] Missing data-api-url attribute. Please add data-api-url="https://your-project.supabase.co/functions/v1"');
+    return;
+  }
+
+  // API endpoints - constructed from the provided base URL
+  const CONFIG_ENDPOINT = `${apiUrl}/widget-config?agentId=${agentId}`;
+
+  // These will be set after fetching config
+  let SUPABASE_URL = null;
+  let ANON_KEY = null;
+  let CHAT_ENDPOINT = null;
+  let LOG_ENDPOINT = null;
 
   let config = null;
   let isOpen = false;
   let messages = [];
   let sessionId = null;
 
-  // Generate session ID
+  // Generate cryptographically secure session ID
   function generateSessionId() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
+    // Use crypto.getRandomValues for secure random generation
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback using crypto.getRandomValues
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    // Set version (4) and variant bits
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
   }
 
   // Check if current domain is allowed
   function isDomainAllowed(allowedDomains) {
     const currentHost = window.location.hostname;
-    
+
     // If no domains specified, allow all (for development)
     if (!allowedDomains || allowedDomains.length === 0) {
       return true;
@@ -40,25 +57,33 @@
 
     return allowedDomains.some(domain => {
       // Exact match or subdomain match
-      return currentHost === domain || 
+      return currentHost === domain ||
              currentHost.endsWith('.' + domain) ||
              domain === 'localhost' && (currentHost === 'localhost' || currentHost === '127.0.0.1');
     });
   }
 
-  // Fetch widget config
+  // Fetch widget config (no auth required for initial config fetch)
   async function fetchConfig() {
     try {
-      const response = await fetch(CONFIG_ENDPOINT, {
-        headers: { 'Authorization': `Bearer ${ANON_KEY}` }
-      });
-      
+      const response = await fetch(CONFIG_ENDPOINT);
+
       if (!response.ok) {
         console.error('[Widget] Failed to fetch config');
         return null;
       }
-      
-      return await response.json();
+
+      const configData = await response.json();
+
+      // Extract API configuration
+      if (configData.apiConfig) {
+        SUPABASE_URL = configData.apiConfig.supabaseUrl;
+        ANON_KEY = configData.apiConfig.anonKey;
+        CHAT_ENDPOINT = `${SUPABASE_URL}/functions/v1/chat`;
+        LOG_ENDPOINT = `${SUPABASE_URL}/functions/v1/log-chat-session`;
+      }
+
+      return configData;
     } catch (error) {
       console.error('[Widget] Config fetch error:', error);
       return null;
@@ -76,7 +101,7 @@
         z-index: 999999;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       }
-      
+
       .chat-widget-launcher {
         display: flex;
         align-items: center;
@@ -92,17 +117,17 @@
         box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         transition: transform 0.2s, box-shadow 0.2s;
       }
-      
+
       .chat-widget-launcher:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 25px rgba(0,0,0,0.2);
       }
-      
+
       .chat-widget-launcher svg {
         width: 20px;
         height: 20px;
       }
-      
+
       .chat-widget-window {
         position: absolute;
         bottom: 70px;
@@ -116,11 +141,11 @@
         flex-direction: column;
         overflow: hidden;
       }
-      
+
       .chat-widget-window.open {
         display: flex;
       }
-      
+
       .chat-widget-header {
         padding: 16px 20px;
         background: ${primaryColor};
@@ -129,13 +154,13 @@
         justify-content: space-between;
         align-items: center;
       }
-      
+
       .chat-widget-header h3 {
         margin: 0;
         font-size: 16px;
         font-weight: 600;
       }
-      
+
       .chat-widget-close {
         background: none;
         border: none;
@@ -145,11 +170,11 @@
         opacity: 0.8;
         transition: opacity 0.2s;
       }
-      
+
       .chat-widget-close:hover {
         opacity: 1;
       }
-      
+
       .chat-widget-messages {
         flex: 1;
         overflow-y: auto;
@@ -158,7 +183,7 @@
         flex-direction: column;
         gap: 12px;
       }
-      
+
       .chat-widget-message {
         max-width: 85%;
         padding: 10px 14px;
@@ -167,28 +192,28 @@
         line-height: 1.4;
         word-wrap: break-word;
       }
-      
+
       .chat-widget-message.user {
         align-self: flex-end;
         background: ${primaryColor};
         color: white;
         border-bottom-right-radius: 4px;
       }
-      
+
       .chat-widget-message.assistant {
         align-self: flex-start;
         background: #f1f5f9;
         color: #1e293b;
         border-bottom-left-radius: 4px;
       }
-      
+
       .chat-widget-input-container {
         padding: 12px 16px;
         border-top: 1px solid #e2e8f0;
         display: flex;
         gap: 8px;
       }
-      
+
       .chat-widget-input {
         flex: 1;
         padding: 10px 14px;
@@ -197,12 +222,14 @@
         font-size: 14px;
         outline: none;
         transition: border-color 0.2s;
+        color: #1e293b;
+        background: white;
       }
-      
+
       .chat-widget-input:focus {
         border-color: ${primaryColor};
       }
-      
+
       .chat-widget-send {
         padding: 10px 16px;
         background: ${primaryColor};
@@ -214,16 +241,16 @@
         font-weight: 500;
         transition: opacity 0.2s;
       }
-      
+
       .chat-widget-send:hover {
         opacity: 0.9;
       }
-      
+
       .chat-widget-send:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
-      
+
       .chat-widget-typing {
         display: flex;
         gap: 4px;
@@ -233,7 +260,7 @@
         align-self: flex-start;
         border-bottom-left-radius: 4px;
       }
-      
+
       .chat-widget-typing span {
         width: 8px;
         height: 8px;
@@ -241,15 +268,15 @@
         border-radius: 50%;
         animation: typing 1.4s infinite;
       }
-      
+
       .chat-widget-typing span:nth-child(2) { animation-delay: 0.2s; }
       .chat-widget-typing span:nth-child(3) { animation-delay: 0.4s; }
-      
+
       @keyframes typing {
         0%, 60%, 100% { transform: translateY(0); }
         30% { transform: translateY(-6px); }
       }
-      
+
       @media (max-width: 440px) {
         .chat-widget-window {
           width: calc(100vw - 40px);
@@ -301,10 +328,15 @@
 
     if (!userMessage.trim()) return;
 
+    if (!CHAT_ENDPOINT || !ANON_KEY) {
+      console.error('[Widget] API not configured');
+      return;
+    }
+
     // Add user message
     messages.push({ role: 'user', content: userMessage });
     messagesContainer.innerHTML += `<div class="chat-widget-message user">${escapeHtml(userMessage)}</div>`;
-    
+
     // Show typing indicator
     messagesContainer.innerHTML += `
       <div class="chat-widget-typing" id="typing-indicator">
@@ -377,19 +409,21 @@
 
       messages.push({ role: 'assistant', content: assistantContent });
 
-      // Log session
-      fetch(`${SUPABASE_URL}/functions/v1/log-chat-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          agentId,
-          sessionId,
-          messages,
-        }),
-      }).catch(() => {}); // Fire and forget
+      // Log session (fire and forget)
+      if (LOG_ENDPOINT) {
+        fetch(LOG_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            agentId,
+            sessionId,
+            messages,
+          }),
+        }).catch(() => {});
+      }
 
     } catch (error) {
       document.getElementById('typing-indicator')?.remove();
@@ -415,8 +449,18 @@
   async function init() {
     config = await fetchConfig();
 
-    if (!config || !config.enabled) {
+    if (!config) {
+      console.error('[Widget] Failed to load configuration');
+      return;
+    }
+
+    if (!config.enabled) {
       console.warn('[Widget] Widget is disabled for this agent');
+      return;
+    }
+
+    if (!config.apiConfig || !config.apiConfig.supabaseUrl || !config.apiConfig.anonKey) {
+      console.error('[Widget] API configuration missing from server response');
       return;
     }
 

@@ -12,6 +12,15 @@ import {
   corsHeaders,
   AuthResult,
 } from '../_shared/auth.ts'
+import {
+  AgentCreateSchema,
+  AgentUpdateSchema,
+  UUIDSchema,
+  AGENT_ALLOWED_UPDATE_FIELDS,
+  filterAllowedFields,
+  validationErrorResponse,
+} from '../_shared/schemas.ts'
+import { ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 
 serve(async (req: Request) => {
   // Handle CORS preflight
@@ -38,6 +47,14 @@ serve(async (req: Request) => {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/').filter(Boolean)
     const agentId = pathParts[1] // /agents/:id
+
+    // Validate agent ID if provided
+    if (agentId) {
+      const idValidation = UUIDSchema.safeParse(agentId)
+      if (!idValidation.success) {
+        return errorResponse('Invalid agent ID format', 400)
+      }
+    }
 
     const db = getAdminClient()
 
@@ -82,15 +99,25 @@ serve(async (req: Request) => {
 
         const body = await req.json()
 
-        // Validate required fields
-        if (!body.name) {
-          return errorResponse('Agent name is required', 400)
+        // Validate input with Zod schema
+        const validation = AgentCreateSchema.safeParse(body)
+        if (!validation.success) {
+          return validationErrorResponse(validation.error)
         }
+
+        const validatedData = validation.data
 
         const { data, error } = await db
           .from('agents')
           .insert({
-            ...body,
+            name: validatedData.name,
+            business_domain: validatedData.business_domain,
+            persona_id: validatedData.persona_id,
+            goals: validatedData.goals,
+            llm_model_id: validatedData.llm_model_id,
+            temperature: validatedData.temperature,
+            max_tokens: validatedData.max_tokens,
+            system_prompt_override: validatedData.system_prompt_override,
             workspace_id: workspaceId, // CRITICAL: Force workspace_id from auth
           })
           .select()
@@ -116,14 +143,28 @@ serve(async (req: Request) => {
 
         const body = await req.json()
 
-        // Remove fields that shouldn't be updated
-        delete body.id
-        delete body.workspace_id
-        delete body.created_at
+        // Validate input with Zod schema
+        const validation = AgentUpdateSchema.safeParse(body)
+        if (!validation.success) {
+          return validationErrorResponse(validation.error)
+        }
+
+        // Filter to only allowed fields (prevents mass assignment)
+        const filteredData = filterAllowedFields(
+          validation.data,
+          AGENT_ALLOWED_UPDATE_FIELDS
+        )
+
+        if (Object.keys(filteredData).length === 0) {
+          return errorResponse('No valid fields to update', 400)
+        }
 
         const { data, error } = await db
           .from('agents')
-          .update(body)
+          .update({
+            ...filteredData,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', agentId)
           .eq('workspace_id', workspaceId) // CRITICAL: Only update own workspace
           .select()
@@ -167,6 +208,10 @@ serve(async (req: Request) => {
         return errorResponse('Method not allowed', 405)
     }
   } catch (err) {
+    // Handle Zod validation errors
+    if (err instanceof ZodError) {
+      return validationErrorResponse(err)
+    }
     console.error('Edge function error:', err)
     return errorResponse('Internal server error', 500)
   }

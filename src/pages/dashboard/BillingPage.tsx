@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { secureApi } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,8 +31,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
 
 interface BillingData {
   subscription: {
@@ -82,66 +81,22 @@ interface BillingData {
   }>;
 }
 
-async function fetchBilling(): Promise<BillingData> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error('Not authenticated');
-
-  const response = await fetch(`${FUNCTIONS_URL}/billing`, {
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  });
-
-  if (!response.ok) throw new Error('Failed to fetch billing');
-  return response.json();
-}
-
-async function createCheckout(planSlug: string, interval: string) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error('Not authenticated');
-
-  const response = await fetch(`${FUNCTIONS_URL}/stripe-checkout`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ plan_slug: planSlug, billing_interval: interval }),
-  });
-
-  if (!response.ok) throw new Error('Failed to create checkout');
-  return response.json();
-}
-
-async function billingAction(action: string) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error('Not authenticated');
-
-  const response = await fetch(`${FUNCTIONS_URL}/billing`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ action }),
-  });
-
-  if (!response.ok) throw new Error('Action failed');
-  return response.json();
-}
-
 const BillingPage: React.FC = () => {
   const { toast } = useToast();
+  const { isAuthenticated, workspace } = useAuth();
   const queryClient = useQueryClient();
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   const { data: billing, isLoading } = useQuery({
-    queryKey: ['billing'],
-    queryFn: fetchBilling,
+    queryKey: ['billing', workspace?.id],
+    queryFn: () => secureApi.get<BillingData>('/billing'),
+    enabled: isAuthenticated && !!workspace?.id,
   });
 
   const checkoutMutation = useMutation({
     mutationFn: ({ planSlug, interval }: { planSlug: string; interval: string }) =>
-      createCheckout(planSlug, interval),
+      secureApi.post<{ type: string; checkout_url?: string }>('/stripe-checkout', { plan_slug: planSlug, billing_interval: interval }),
     onSuccess: (data) => {
       if (data.type === 'checkout' && data.checkout_url) {
         window.location.href = data.checkout_url;
@@ -155,7 +110,7 @@ const BillingPage: React.FC = () => {
   });
 
   const portalMutation = useMutation({
-    mutationFn: () => billingAction('portal'),
+    mutationFn: () => secureApi.post<{ portal_url?: string }>('/billing', { action: 'portal' }),
     onSuccess: (data) => {
       if (data.portal_url) {
         window.open(data.portal_url, '_blank');
@@ -164,7 +119,7 @@ const BillingPage: React.FC = () => {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: () => billingAction('cancel'),
+    mutationFn: () => secureApi.post<{ success: boolean }>('/billing', { action: 'cancel' }),
     onSuccess: () => {
       toast({ title: 'Subscription Canceled', description: 'Your subscription will end at the current period.' });
       queryClient.invalidateQueries({ queryKey: ['billing'] });
@@ -173,7 +128,7 @@ const BillingPage: React.FC = () => {
   });
 
   const resumeMutation = useMutation({
-    mutationFn: () => billingAction('resume'),
+    mutationFn: () => secureApi.post<{ success: boolean }>('/billing', { action: 'resume' }),
     onSuccess: () => {
       toast({ title: 'Subscription Resumed', description: 'Your subscription is now active.' });
       queryClient.invalidateQueries({ queryKey: ['billing'] });

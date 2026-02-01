@@ -45,8 +45,8 @@ const AgentDetail: React.FC = () => {
   const { data: allKnowledgeSources } = useKnowledgeSources();
   const updateAgent = useUpdateAgent();
 
-  const knowledge = allKnowledgeSources?.filter(k => 
-    agent?.knowledge_source_ids?.includes(k.id)
+  const knowledge = allKnowledgeSources?.filter(k =>
+    agent?.knowledge_source_ids && Array.isArray(agent.knowledge_source_ids) && agent.knowledge_source_ids.includes(k.id)
   ) || [];
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -312,25 +312,20 @@ const AgentDetail: React.FC = () => {
         <TabsContent value="actions">
           <Card className="glass border-border/50">
             <CardHeader>
-              <CardTitle>Allowed Actions</CardTitle>
-              <CardDescription>What this agent can do during conversations</CardDescription>
+              <CardTitle>Function Calling Tools</CardTitle>
+              <CardDescription>Configure tools that enable your agent to take actions during conversations</CardDescription>
             </CardHeader>
             <CardContent>
-              {(!agent.allowed_actions || agent.allowed_actions.length === 0) ? (
-                <div className="text-center py-8">
-                  <Zap className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No actions configured</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {agent.allowed_actions.map(action => (
-                    <div key={action} className="flex items-center gap-4 p-4 rounded-lg bg-secondary/30">
-                      <Zap className="w-5 h-5 text-primary" />
-                      <p className="font-medium">{action}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="text-center py-8">
+                <Zap className="w-10 h-10 mx-auto mb-3 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground mb-4">
+                  Enable your agent to call webhooks, book appointments, send emails, and more.
+                </p>
+                <Button onClick={() => navigate(`/dashboard/agents/${agent.id}/tools`)}>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Manage Tools
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

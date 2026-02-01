@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { personasApi, ApiError } from '@/lib/api';
 
 export interface PersonaRow {
   id: string;
@@ -19,43 +19,32 @@ export interface PersonaRow {
 }
 
 export function usePersonas() {
-  const { workspace } = useAuth();
+  const { workspace, isAuthenticated } = useAuth();
   const workspaceId = workspace?.id;
 
   return useQuery({
     queryKey: ['personas', workspaceId],
     queryFn: async () => {
-      if (!workspaceId) return [];
-      
-      const { data, error } = await supabase
-        .from('personas')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      // Uses secure Edge Function - no direct DB access
+      const data = await personasApi.list();
       return data as PersonaRow[];
     },
-    enabled: !!workspaceId,
+    enabled: !!workspaceId && isAuthenticated,
   });
 }
 
 export function usePersona(id: string | undefined) {
+  const { isAuthenticated } = useAuth();
+
   return useQuery({
     queryKey: ['persona', id],
     queryFn: async () => {
       if (!id) return null;
-      
-      const { data, error } = await supabase
-        .from('personas')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (error) throw error;
+      // Uses secure Edge Function - no direct DB access
+      const data = await personasApi.get(id);
       return data as PersonaRow | null;
     },
-    enabled: !!id,
+    enabled: !!id && isAuthenticated,
   });
 }
 
@@ -67,25 +56,16 @@ export function useCreatePersona() {
   return useMutation({
     mutationFn: async (persona: Omit<PersonaRow, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
       if (!workspace?.id) throw new Error('No workspace selected');
-
-      const { data, error } = await supabase
-        .from('personas')
-        .insert({
-          ...persona,
-          workspace_id: workspace.id,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // Uses secure Edge Function - workspace_id is set server-side from auth token
+      return await personasApi.create(persona);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['personas'] });
       toast({ title: 'Persona created', description: 'Your persona has been created successfully.' });
     },
     onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const message = error instanceof ApiError ? error.message : 'Failed to create persona';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 }
@@ -96,15 +76,8 @@ export function useUpdatePersona() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<PersonaRow> & { id: string }) => {
-      const { data, error } = await supabase
-        .from('personas')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // Uses secure Edge Function - validates ownership server-side
+      return await personasApi.update(id, updates);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['personas'] });
@@ -112,7 +85,8 @@ export function useUpdatePersona() {
       toast({ title: 'Persona updated', description: 'Your changes have been saved.' });
     },
     onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const message = error instanceof ApiError ? error.message : 'Failed to update persona';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 }
@@ -123,19 +97,16 @@ export function useDeletePersona() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('personas')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      // Uses secure Edge Function - validates ownership server-side
+      await personasApi.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['personas'] });
       toast({ title: 'Persona deleted', description: 'The persona has been removed.' });
     },
     onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const message = error instanceof ApiError ? error.message : 'Failed to delete persona';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 }

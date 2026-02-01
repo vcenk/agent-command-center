@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -186,9 +187,12 @@ const IntegrationCard: React.FC<{ integration: Integration }> = ({ integration }
 };
 
 const IntegrationsPage: React.FC = () => {
+  const { isAuthenticated, workspace } = useAuth();
+
   const { data: integrations, isLoading, error } = useQuery({
-    queryKey: ['integrations'],
+    queryKey: ['integrations', workspace?.id],
     queryFn: () => secureApi.get<Integration[]>('/integrations'),
+    enabled: isAuthenticated && !!workspace?.id,
   });
 
   // Group integrations by category

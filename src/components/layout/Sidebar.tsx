@@ -28,6 +28,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface NavItem {
   name: string;
@@ -118,28 +124,29 @@ export const Sidebar: React.FC = () => {
   })).filter(group => group.items.length > 0);
 
   return (
-    <aside
-      className={cn(
-        'flex flex-col h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300',
-        collapsed ? 'w-16' : 'w-64'
-      )}
-    >
-      {/* Logo */}
-      <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <MessageSquare className="w-4 h-4 text-primary-foreground" />
+    <TooltipProvider>
+      <aside
+        className={cn(
+          'flex flex-col h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300',
+          collapsed ? 'w-16' : 'w-64'
+        )}
+      >
+        {/* Logo */}
+        <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <MessageSquare className="w-4 h-4 text-primary-foreground" />
+            </div>
+            {!collapsed && (
+              <span className="font-semibold text-foreground text-gradient">
+                Agent Cockpit
+              </span>
+            )}
           </div>
-          {!collapsed && (
-            <span className="font-semibold text-foreground text-gradient">
-              Agent Cockpit
-            </span>
-          )}
         </div>
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto">
+        {/* Navigation */}
+        <nav className="flex-1 py-4 overflow-y-auto">
         <div className="space-y-4 px-2">
           {filteredGroups.map((group) => {
             const groupActive = isGroupActive(group.items, location.pathname);
@@ -151,6 +158,35 @@ export const Sidebar: React.FC = () => {
               const item = group.items[0];
               const isActive = location.pathname === item.href ||
                 (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
+
+              // When collapsed, wrap in tooltip
+              if (collapsed) {
+                return (
+                  <div key={group.name}>
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <Link
+                          to={item.href}
+                          className={cn(
+                            'flex items-center justify-center p-2 rounded-md transition-all duration-200',
+                            isActive
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                          )}
+                        >
+                          <item.icon className={cn(
+                            'w-5 h-5',
+                            isActive && 'text-primary'
+                          )} />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={8}>
+                        {item.name}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                );
+              }
 
               return (
                 <div key={group.name}>
@@ -167,10 +203,8 @@ export const Sidebar: React.FC = () => {
                       'w-5 h-5 flex-shrink-0',
                       isActive && 'text-primary'
                     )} />
-                    {!collapsed && (
-                      <span className="text-sm font-medium">{item.name}</span>
-                    )}
-                    {isActive && !collapsed && (
+                    <span className="text-sm font-medium">{item.name}</span>
+                    {isActive && (
                       <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow" />
                     )}
                   </Link>
@@ -230,7 +264,7 @@ export const Sidebar: React.FC = () => {
                   })}
                 </CollapsibleContent>
 
-                {/* Show icons only when collapsed */}
+                {/* Show icons only when collapsed - with tooltips */}
                 {collapsed && (
                   <div className="space-y-1">
                     {group.items.map((item) => {
@@ -238,22 +272,27 @@ export const Sidebar: React.FC = () => {
                         (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
 
                       return (
-                        <Link
-                          key={item.name}
-                          to={item.href}
-                          title={item.name}
-                          className={cn(
-                            'flex items-center justify-center p-2 rounded-md transition-all duration-200',
-                            isActive
-                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-                          )}
-                        >
-                          <item.icon className={cn(
-                            'w-5 h-5',
-                            isActive && 'text-primary'
-                          )} />
-                        </Link>
+                        <Tooltip key={item.name} delayDuration={0}>
+                          <TooltipTrigger asChild>
+                            <Link
+                              to={item.href}
+                              className={cn(
+                                'flex items-center justify-center p-2 rounded-md transition-all duration-200',
+                                isActive
+                                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                              )}
+                            >
+                              <item.icon className={cn(
+                                'w-5 h-5',
+                                isActive && 'text-primary'
+                              )} />
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" sideOffset={8}>
+                            {item.name}
+                          </TooltipContent>
+                        </Tooltip>
                       );
                     })}
                   </div>
@@ -264,22 +303,23 @@ export const Sidebar: React.FC = () => {
         </div>
       </nav>
 
-      {/* Collapse toggle */}
-      <div className="p-2 border-t border-sidebar-border">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full h-9"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <ChevronLeft className="w-4 h-4" />
-          )}
-        </Button>
-      </div>
-    </aside>
+        {/* Collapse toggle */}
+        <div className="p-2 border-t border-sidebar-border">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className="w-full h-9"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <ChevronLeft className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+      </aside>
+    </TooltipProvider>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { secureApi } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,8 +25,6 @@ import {
 import {
   MessageSquare,
   Users,
-  TrendingUp,
-  TrendingDown,
   Clock,
   Bot,
   Target,
@@ -34,8 +33,6 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
 
 interface AnalyticsData {
   overview: {
@@ -79,24 +76,14 @@ interface AnalyticsData {
   period: string;
 }
 
-async function fetchAnalytics(period: string): Promise<AnalyticsData> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error('Not authenticated');
-
-  const response = await fetch(`${FUNCTIONS_URL}/analytics?period=${period}`, {
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  });
-
-  if (!response.ok) throw new Error('Failed to fetch analytics');
-  return response.json();
-}
-
 const AnalyticsPage: React.FC = () => {
   const [period, setPeriod] = useState('30d');
+  const { isAuthenticated, workspace } = useAuth();
 
   const { data: analytics, isLoading } = useQuery({
-    queryKey: ['analytics', period],
-    queryFn: () => fetchAnalytics(period),
+    queryKey: ['analytics', period, workspace?.id],
+    queryFn: () => secureApi.get<AnalyticsData>(`/analytics?period=${period}`),
+    enabled: isAuthenticated && !!workspace?.id,
   });
 
   const formatDate = (date: string) => {

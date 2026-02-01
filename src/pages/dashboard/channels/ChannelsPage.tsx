@@ -364,6 +364,20 @@ const ChannelsPage: React.FC = () => {
     </div>
   );
 
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const webhookUrl = `${supabaseUrl}/functions/v1/voice/incoming`;
+  const statusCallbackUrl = `${supabaseUrl}/functions/v1/voice/status`;
+
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [copiedStatusUrl, setCopiedStatusUrl] = useState(false);
+
+  const handleCopyWebhookUrl = (url: string, setter: (v: boolean) => void) => {
+    navigator.clipboard.writeText(url);
+    setter(true);
+    setTimeout(() => setter(false), 2000);
+    toast({ title: 'Copied', description: 'URL copied to clipboard.' });
+  };
+
   const renderPhoneDialog = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -395,9 +409,55 @@ const ChannelsPage: React.FC = () => {
           id="phone-number"
           value={phoneConfig.phoneNumber}
           onChange={(e) => setPhoneConfig(prev => ({ ...prev, phoneNumber: e.target.value }))}
-          placeholder="+1 (555) 123-4567"
+          placeholder="+15551234567"
         />
+        <p className="text-xs text-muted-foreground">
+          Your Twilio phone number in E.164 format (e.g., +15551234567)
+        </p>
       </div>
+
+      {/* Twilio Webhook URLs */}
+      {phoneConfig.provider === 'twilio' && supabaseUrl && (
+        <div className="space-y-3 p-3 bg-secondary/50 rounded-lg">
+          <p className="text-xs font-medium text-muted-foreground">
+            Configure these URLs in your Twilio phone number settings:
+          </p>
+          <div className="space-y-1">
+            <Label className="text-xs">Voice Webhook URL (HTTP POST)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={webhookUrl}
+                className="text-xs font-mono bg-background"
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleCopyWebhookUrl(webhookUrl, setCopiedWebhook)}
+              >
+                {copiedWebhook ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Status Callback URL (HTTP POST)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={statusCallbackUrl}
+                className="text-xs font-mono bg-background"
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleCopyWebhookUrl(statusCallbackUrl, setCopiedStatusUrl)}
+              >
+                {copiedStatusUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="business-hours">Business Hours</Label>
@@ -417,7 +477,7 @@ const ChannelsPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <Label htmlFor="voicemail">Voicemail Fallback</Label>
-          <p className="text-xs text-muted-foreground">Allow voicemail if agent unavailable</p>
+          <p className="text-xs text-muted-foreground">Allow voicemail if outside business hours</p>
         </div>
         <Switch
           id="voicemail"

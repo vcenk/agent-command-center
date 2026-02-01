@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ChannelBadge, StatusBadge } from '@/components/shared/StatusBadge';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { MessageSquare, Filter } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -23,30 +25,18 @@ const SessionsList: React.FC = () => {
     channel: channelFilter,
   });
 
-  const getStatusBadge = (status: string) => {
+  // Helper to get session status display
+  const getSessionStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="default" className="bg-green-500/20 text-green-400 border-green-500/30">Open</Badge>;
+        return <StatusBadge variant="success">Open</StatusBadge>;
       case 'closed':
-        return <Badge variant="secondary">Closed</Badge>;
+        return <StatusBadge variant="secondary">Closed</StatusBadge>;
+      case 'escalated':
+        return <StatusBadge variant="error">Escalated</StatusBadge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <StatusBadge variant="default">{status}</StatusBadge>;
     }
-  };
-
-  const getChannelBadge = (channel: string | null) => {
-    const channelName = channel || 'web';
-    const colors: Record<string, string> = {
-      web: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      whatsapp: 'bg-green-500/20 text-green-400 border-green-500/30',
-      sms: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-      phone: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    };
-    return (
-      <Badge variant="outline" className={colors[channelName] || ''}>
-        {channelName.charAt(0).toUpperCase() + channelName.slice(1)}
-      </Badge>
-    );
   };
 
   const truncateMessage = (message: string | null, maxLength = 60) => {
@@ -131,13 +121,11 @@ const SessionsList: React.FC = () => {
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading sessions...</div>
           ) : !sessions || sessions.length === 0 ? (
-            <div className="text-center py-12">
-              <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No sessions found</p>
-              <p className="text-sm text-muted-foreground/70 mt-1">
-                Chat sessions will appear here when users interact with your agents.
-              </p>
-            </div>
+            <EmptyState
+              icon={MessageSquare}
+              title="No sessions found"
+              description="Chat sessions will appear here when users interact with your agents."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -160,13 +148,11 @@ const SessionsList: React.FC = () => {
                     <TableCell className="font-medium">
                       {session.agents?.name || 'Unknown Agent'}
                     </TableCell>
-                    <TableCell>{getChannelBadge(session.channel)}</TableCell>
-                    <TableCell>{getStatusBadge(session.status)}</TableCell>
+                    <TableCell><ChannelBadge channel={session.channel} /></TableCell>
+                    <TableCell>{getSessionStatusBadge(session.status)}</TableCell>
                     <TableCell>
                       {session.lead_captured ? (
-                        <Badge variant="outline" className="bg-amber-500/20 text-amber-400 border-amber-500/30">
-                          Lead
-                        </Badge>
+                        <StatusBadge variant="warning">Lead</StatusBadge>
                       ) : (
                         <span className="text-muted-foreground text-sm">—</span>
                       )}

@@ -1,5 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
+import {
+  rateLimit,
+  RATE_LIMITS,
+  getClientIP,
+} from "../_shared/ratelimit.ts";
+import {
+  ChatRequestSchema,
+  validationErrorResponse,
+} from "../_shared/schemas.ts";
+import { ZodError } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,9 +110,21 @@ async function sendSlackNotification(
   }
 }
 
+// Types for Supabase operations
+interface SupabaseClientType {
+  from: (table: string) => unknown;
+  rpc: (fn: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+}
+
+interface LeadUpdates {
+  email?: string;
+  phone?: string;
+  updated_at: string;
+}
+
 // Upsert lead - non-blocking
 async function upsertLead(
-  supabase: any,
+  supabase: SupabaseClientType,
   workspaceId: string,
   agentId: string,
   sessionId: string,
@@ -113,7 +135,7 @@ async function upsertLead(
 ): Promise<string | null> {
   try {
     // Check if lead already exists for this session
-    const { data: existingLead } = await supabase
+    const { data: existingLead } = await (supabase as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: { id: string; email: string | null; phone: string | null } | null }> } } } })
       .from('leads')
       .select('id, email, phone')
       .eq('session_id', sessionId)
@@ -121,7 +143,7 @@ async function upsertLead(
 
     if (existingLead) {
       // Merge - update only if we have new info
-      const updates: any = { updated_at: new Date().toISOString() };
+      const updates: LeadUpdates = { updated_at: new Date().toISOString() };
       let isNewInfo = false;
       if (email && !existingLead.email) {
         updates.email = email;
@@ -204,21 +226,21 @@ serve(async (req) => {
   }
 
   try {
-    const { agentId, messages, sessionId } = (await req.json()) as ChatRequest;
-
-    if (!agentId) {
-      return new Response(
-        JSON.stringify({ error: "agentId is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Rate limit check - by IP and session
+    const rateLimitResult = rateLimit(req, 'chat', RATE_LIMITS.WIDGET_CHAT);
+    if (rateLimitResult) {
+      return rateLimitResult;
     }
 
-    if (!messages || messages.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "messages array is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const body = await req.json();
+
+    // Validate input with Zod schema
+    const validation = ChatRequestSchema.safeParse(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.error);
     }
+
+    const { agentId, messages, sessionId } = validation.data;
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -342,7 +364,7 @@ serve(async (req) => {
       const latestUserMessage = messages.filter(m => m.role === "user").pop()?.content || "";
 
       // Try vector-based semantic search first
-      let matchedChunks: any[] = [];
+      let matchedChunks: Array<{ content: string; source_name?: string }> = [];
       const queryEmbedding = await generateQueryEmbedding(latestUserMessage, OPENAI_API_KEY!);
 
       if (queryEmbedding) {
@@ -469,7 +491,15 @@ serve(async (req) => {
     }
 
     // Load agent's enabled tools for function calling
-    let openAITools: any[] = [];
+    interface OpenAITool {
+      type: string;
+      function: {
+        name: string;
+        description: string;
+        parameters: Record<string, unknown>;
+      };
+    }
+    let openAITools: OpenAITool[] = [];
     if (agent?.id) {
       const { data: agentTools, error: toolsError } = await supabase
         .from("agent_tools")
@@ -559,6 +589,10 @@ When you need to use a tool, call the appropriate function with the required par
     });
 
   } catch (error) {
+    // Handle validation errors
+    if (error instanceof ZodError) {
+      return validationErrorResponse(error);
+    }
     console.error("Chat function error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),

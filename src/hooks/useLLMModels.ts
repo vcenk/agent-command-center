@@ -108,41 +108,19 @@ export const useUpdateWorkspaceLLMConfig = () => {
   });
 };
 
-// Provider display info
+// Provider display info (OpenAI-only for simplicity)
 export const LLM_PROVIDER_INFO: Record<string, { name: string; description: string; icon: string }> = {
   openai: {
     name: 'OpenAI',
-    description: 'GPT-4, GPT-4o, and GPT-3.5 models',
+    description: 'GPT-4o, GPT-4o Mini, GPT-4 Turbo, and GPT-3.5 Turbo',
     icon: '🤖',
   },
-  anthropic: {
-    name: 'Anthropic',
-    description: 'Claude 3.5 Sonnet, Haiku, and Opus models',
-    icon: '🧠',
-  },
-  google: {
-    name: 'Google',
-    description: 'Gemini 1.5 Pro and Flash models',
-    icon: '✨',
-  },
-  mistral: {
-    name: 'Mistral AI',
-    description: 'Mistral Large, Medium, and Small models',
-    icon: '💨',
-  },
-  groq: {
-    name: 'Groq',
-    description: 'Ultra-fast inference with Llama and Mixtral',
-    icon: '⚡',
-  },
-  together: {
-    name: 'Together AI',
-    description: 'Open source models with flexible pricing',
-    icon: '🤝',
-  },
-  custom: {
-    name: 'Custom',
-    description: 'Connect your own OpenAI-compatible endpoint',
-    icon: '🔧',
-  },
+};
+
+// OpenAI model recommendations
+export const OPENAI_MODEL_RECOMMENDATIONS: Record<string, string> = {
+  'gpt-4o': 'Best for complex reasoning and vision tasks',
+  'gpt-4o-mini': 'Recommended - Fast, affordable, great for most use cases',
+  'gpt-4-turbo': 'Powerful with large context window',
+  'gpt-3.5-turbo': 'Most affordable, good for simple conversations',
 };

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Role } from '@/types';
+import { workspacesApi, Workspace as ApiWorkspace } from '@/lib/api';
 
 interface Profile {
   id: string;
@@ -93,32 +94,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserWorkspaces = async (): Promise<Array<{ workspace: Workspace; role: Role }>> => {
     if (!user) return [];
 
-    // Get all user_roles for this user
-    const { data: roles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('role, workspace_id')
-      .eq('user_id', user.id);
-
-    if (rolesError || !roles || roles.length === 0) {
+    try {
+      const data = await workspacesApi.list();
+      return data.map(item => ({
+        workspace: item.workspace as Workspace,
+        role: item.role as Role,
+      }));
+    } catch (error: unknown) {
+      // Re-throw auth errors so callers can handle redirect
+      if (error && typeof error === 'object' && 'status' in error) {
+        const status = (error as { status: number }).status;
+        if (status === 401 || status === 403) {
+          throw error;
+        }
+      }
+      console.error('Error fetching workspaces:', error);
       return [];
     }
-
-    // Fetch workspace details for each role
-    const workspaceIds = roles.map(r => r.workspace_id);
-    const { data: workspaces, error: wsError } = await supabase
-      .from('workspaces')
-      .select('*')
-      .in('id', workspaceIds);
-
-    if (wsError || !workspaces) {
-      return [];
-    }
-
-    // Combine workspace and role data
-    return roles.map(r => {
-      const ws = workspaces.find(w => w.id === r.workspace_id);
-      return ws ? { workspace: ws, role: r.role as Role } : null;
-    }).filter(Boolean) as Array<{ workspace: Workspace; role: Role }>;
   };
 
   const refreshProfile = async () => {
@@ -140,32 +132,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Helper function to load user data with proper error handling
+    const loadUserData = async (userId: string) => {
+      try {
+        const profileData = await fetchProfile(userId);
+        if (!isMounted) return;
+
+        if (profileData) {
+          setProfile(profileData);
+
+          if (profileData.workspace_id) {
+            const workspaceData = await fetchWorkspace(profileData.workspace_id);
+            if (!isMounted) return;
+
+            if (workspaceData) {
+              setWorkspaceState(workspaceData);
+              const role = await fetchUserRole(userId, workspaceData.id);
+              if (!isMounted) return;
+              setUserRole(role);
+            }
+          }
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Error loading user data:', error);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!isMounted) return;
+
         setSession(session);
         setUser(session?.user ?? null);
 
         // Defer Supabase calls with setTimeout to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
-            fetchProfile(session.user.id).then((profileData) => {
-              if (profileData) {
-                setProfile(profileData);
-
-                if (profileData.workspace_id) {
-                  fetchWorkspace(profileData.workspace_id).then((workspaceData) => {
-                    if (workspaceData) {
-                      setWorkspaceState(workspaceData);
-                      fetchUserRole(session.user.id, workspaceData.id).then((role) => {
-                        setUserRole(role);
-                      });
-                    }
-                  });
-                }
-              }
-              setIsLoading(false);
-            });
+            if (isMounted) {
+              loadUserData(session.user.id);
+            }
           }, 0);
         } else {
           setProfile(null);
@@ -177,40 +190,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
 
-      if (session?.user) {
-        fetchProfile(session.user.id).then((profileData) => {
-          if (profileData) {
-            setProfile(profileData);
+        setSession(session);
+        setUser(session?.user ?? null);
 
-            if (profileData.workspace_id) {
-              fetchWorkspace(profileData.workspace_id).then((workspaceData) => {
-                if (workspaceData) {
-                  setWorkspaceState(workspaceData);
-                  fetchUserRole(session.user.id, workspaceData.id).then((role) => {
-                    setUserRole(role);
-                    setIsLoading(false);
-                  });
-                } else {
-                  setIsLoading(false);
-                }
-              });
-            } else {
-              setIsLoading(false);
-            }
-          } else {
-            setIsLoading(false);
-          }
-        });
-      } else {
+        if (session?.user) {
+          await loadUserData(session.user.id);
+        } else {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Error initializing auth:', error);
         setIsLoading(false);
       }
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const logout = async () => {
@@ -225,89 +230,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const setWorkspace = async (ws: Workspace, role: Role = 'OWNER') => {
     if (!user) return;
 
-    // Update profile with workspace
-    await supabase
-      .from('profiles')
-      .update({ workspace_id: ws.id })
-      .eq('id', user.id);
-
-    // Add user role for this workspace (use insert, handle conflict)
-    const { error: roleError } = await supabase
-      .from('user_roles')
-      .upsert(
-        {
-          user_id: user.id,
-          workspace_id: ws.id,
-          role: role,
-        },
-        { onConflict: 'user_id,workspace_id' }
-      );
-
-    if (roleError) {
-      console.error('Failed to upsert user role:', roleError);
+    try {
+      // Use API to switch workspace (handles user_roles via service role)
+      const result = await workspacesApi.switch(ws.id);
+      setWorkspaceState(result.workspace as Workspace);
+      setUserRole(result.role as Role);
+      setProfile((prev) => prev ? { ...prev, workspace_id: ws.id } : null);
+    } catch (error) {
+      console.error('Failed to set workspace:', error);
+      // Fallback: just update local state
+      setWorkspaceState(ws);
+      setUserRole(role);
+      setProfile((prev) => prev ? { ...prev, workspace_id: ws.id } : null);
     }
-
-    setWorkspaceState(ws);
-    setUserRole(role);
-    setProfile((prev) => prev ? { ...prev, workspace_id: ws.id } : null);
   };
 
   const switchWorkspace = async (workspaceId: string) => {
     if (!user) return;
 
-    const workspaceData = await fetchWorkspace(workspaceId);
-    if (workspaceData) {
-      await supabase
-        .from('profiles')
-        .update({ workspace_id: workspaceId })
-        .eq('id', user.id);
-
-      const role = await fetchUserRole(user.id, workspaceId);
-      setWorkspaceState(workspaceData);
-      setUserRole(role);
+    try {
+      const result = await workspacesApi.switch(workspaceId);
+      setWorkspaceState(result.workspace as Workspace);
+      setUserRole(result.role as Role);
       setProfile((prev) => prev ? { ...prev, workspace_id: workspaceId } : null);
+    } catch (error) {
+      console.error('Failed to switch workspace:', error);
     }
   };
 
   const createWorkspace = async (name: string): Promise<Workspace> => {
     if (!user) throw new Error('User not authenticated');
-    
-    // Create the workspace
-    const { data, error } = await supabase
-      .from('workspaces')
-      .insert({ name, created_by: user.id })
-      .select()
-      .single();
 
-    if (error) {
-      throw error;
-    }
+    // Use API to create workspace (handles user_roles via service role)
+    const workspace = await workspacesApi.create(name);
 
-    // Insert user role as OWNER - this is critical for RLS to work
-    const { error: roleError } = await supabase
-      .from('user_roles')
-      .insert({
-        user_id: user.id,
-        workspace_id: data.id,
-        role: 'OWNER',
-      });
+    const wsData: Workspace = {
+      id: workspace.id,
+      name: workspace.name,
+      created_at: workspace.created_at,
+    };
 
-    if (roleError) {
-      console.error('Failed to create user role:', roleError);
-      // Still continue but log the error
-    }
-
-    // Update profile with workspace
-    await supabase
-      .from('profiles')
-      .update({ workspace_id: data.id })
-      .eq('id', user.id);
-
-    setWorkspaceState(data);
+    setWorkspaceState(wsData);
     setUserRole('OWNER');
-    setProfile((prev) => prev ? { ...prev, workspace_id: data.id } : null);
-    
-    return data;
+    setProfile((prev) => prev ? { ...prev, workspace_id: workspace.id } : null);
+
+    return wsData;
   };
 
   const hasPermission = (action: 'read' | 'write' | 'admin' | 'billing'): boolean => {
@@ -327,6 +294,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // isAuthenticated should only be true when we have both user AND a valid session
+  const isAuthenticated = !!user && !!session?.access_token;
+
   return (
     <AuthContext.Provider
       value={{
@@ -335,7 +305,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         profile,
         workspace,
         userRole,
-        isAuthenticated: !!user,
+        isAuthenticated,
         isLoading,
         logout,
         setWorkspace,

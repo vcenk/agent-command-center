@@ -6,12 +6,14 @@ import { useLeads, LeadFilters } from '@/hooks/useLeads';
 import { useAgents } from '@/hooks/useAgents';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ChannelBadge } from '@/components/shared/StatusBadge';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { toast } from 'sonner';
 
 const LeadsPage = () => {
@@ -66,18 +68,13 @@ const LeadsPage = () => {
     toast.success('CSV exported successfully');
   };
 
-  const getChannelBadge = (channel: string | null) => {
-    switch (channel) {
-      case 'web':
-        return <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30">Web</Badge>;
-      case 'whatsapp':
-        return <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30">WhatsApp</Badge>;
-      case 'sms':
-        return <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30">SMS</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
-    }
-  };
+  // Calculate active filter count for filter indicator
+  const activeFilterCount = [
+    agentFilter !== 'all',
+    channelFilter !== 'all',
+    dateRange !== 'all',
+    searchQuery.length > 0,
+  ].filter(Boolean).length;
 
   return (
     <div className="space-y-6">
@@ -93,56 +90,60 @@ const LeadsPage = () => {
       />
 
       {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by email, phone, or name..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <Select value={agentFilter} onValueChange={setAgentFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Agents" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Agents</SelectItem>
-                {agents?.map(agent => (
-                  <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={channelFilter} onValueChange={setChannelFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="All Channels" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Channels</SelectItem>
-                <SelectItem value="web">Web</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                <SelectItem value="sms">SMS</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={dateRange} onValueChange={(v) => setDateRange(v as '7' | '30' | '90' | 'all')}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
-                <SelectItem value="all">All time</SelectItem>
-              </SelectContent>
-            </Select>
+      <FilterBar
+        activeFilterCount={activeFilterCount}
+        onClearFilters={() => {
+          setSearchQuery('');
+          setAgentFilter('all');
+          setChannelFilter('all');
+          setDateRange('30');
+        }}
+      >
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by email, phone, or name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <Select value={agentFilter} onValueChange={setAgentFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Agents" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Agents</SelectItem>
+            {agents?.map(agent => (
+              <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={channelFilter} onValueChange={setChannelFilter}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="All Channels" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Channels</SelectItem>
+            <SelectItem value="web">Web</SelectItem>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            <SelectItem value="sms">SMS</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={dateRange} onValueChange={(v) => setDateRange(v as '7' | '30' | '90' | 'all')}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Date Range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">Last 7 days</SelectItem>
+            <SelectItem value="30">Last 30 days</SelectItem>
+            <SelectItem value="90">Last 90 days</SelectItem>
+            <SelectItem value="all">All time</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterBar>
 
       {/* Leads Table */}
       <Card>
@@ -160,11 +161,11 @@ const LeadsPage = () => {
               ))}
             </div>
           ) : leads?.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No leads captured yet</p>
-              <p className="text-sm mt-1">Leads will appear here when visitors share their contact info</p>
-            </div>
+            <EmptyState
+              icon={Mail}
+              title="No leads captured yet"
+              description="Leads will appear here when visitors share their contact info through your chat agents."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -187,7 +188,7 @@ const LeadsPage = () => {
                     <TableCell className="font-medium">
                       {lead.agents?.name || 'Unknown'}
                     </TableCell>
-                    <TableCell>{getChannelBadge(lead.channel)}</TableCell>
+                    <TableCell><ChannelBadge channel={lead.channel} /></TableCell>
                     <TableCell>{lead.name || '-'}</TableCell>
                     <TableCell>
                       {lead.email ? (

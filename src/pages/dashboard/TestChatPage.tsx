@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAgents } from '@/hooks/useAgents';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,9 @@ interface ChatMessage {
   content: string;
 }
 
-const SUPABASE_URL = 'https://ehvcrdooykxmcpcopuxz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVodmNyZG9veWt4bWNwY29wdXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczODA0MDEsImV4cCI6MjA4Mjk1NjQwMX0.flymd8csmFzEM8jrPXZ7pylX78Yl_fKOnTOSxDp8k7I';
+// Use environment variables for API configuration
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Generate a proper UUID for the session
 const generateSessionId = () => crypto.randomUUID();
@@ -38,7 +39,7 @@ export default function TestChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Allow both draft and live agents for testing
-  const testableAgents = agents || [];
+  const testableAgents = useMemo(() => agents || [], [agents]);
   const selectedAgent = testableAgents.find(a => a.id === selectedAgentId);
 
   // Set agent from URL query param on mount

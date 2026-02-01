@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,9 @@ const Onboarding: React.FC = () => {
   const { createWorkspace, setWorkspace, fetchUserWorkspaces, user, workspace } = useAuth();
   const navigate = useNavigate();
 
+  // Use refs to track if effects have run to prevent duplicate calls
+  const hasCheckedWorkspaces = useRef(false);
+
   // If user already has a workspace set, redirect to dashboard
   useEffect(() => {
     if (workspace) {
@@ -31,12 +34,15 @@ const Onboarding: React.FC = () => {
     }
   }, [workspace, navigate]);
 
-  // Check for existing workspaces on mount
-  useEffect(() => {
-    const checkExistingWorkspaces = async () => {
+  // Memoized function to check existing workspaces
+  const checkExistingWorkspaces = useCallback(async () => {
+    if (hasCheckedWorkspaces.current) return;
+    hasCheckedWorkspaces.current = true;
+
+    try {
       const workspaces = await fetchUserWorkspaces();
       setExistingWorkspaces(workspaces);
-      
+
       if (workspaces.length > 0) {
         // If user has exactly one workspace, auto-select it
         if (workspaces.length === 1) {
@@ -48,12 +54,26 @@ const Onboarding: React.FC = () => {
       } else {
         setStep('create');
       }
-    };
+    } catch (error: unknown) {
+      // If auth error, redirect to login
+      if (error && typeof error === 'object' && 'status' in error && (error as { status: number }).status === 401) {
+        navigate('/login');
+        return;
+      }
+      // For other errors, just show create workspace form
+      setStep('create');
+    }
+  }, [fetchUserWorkspaces, setWorkspace, navigate]);
 
+  // Check for existing workspaces on mount
+  useEffect(() => {
     if (user) {
       checkExistingWorkspaces();
+    } else {
+      // No user, redirect to login
+      navigate('/login');
     }
-  }, [user, fetchUserWorkspaces, setWorkspace, navigate]);
+  }, [user, checkExistingWorkspaces, navigate]);
 
   const handleSelectWorkspace = async (ws: WorkspaceOption) => {
     setIsLoading(true);

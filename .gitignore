@@ -1,3 +1,19 @@
+# Environment files (keep .env.example, ignore actual secrets)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Supabase
+.supabase
+supabase/.temp/
+
+# Voice server
+voice-server/node_modules
+voice-server/dist
+voice-server/.env
+
 # Logs
 logs
 *.log

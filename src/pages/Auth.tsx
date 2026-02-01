@@ -102,11 +102,12 @@ const Auth: React.FC = () => {
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Auth error:', error);
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
       toast({
         title: 'Error',
-        description: error.message || 'An unexpected error occurred.',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -174,9 +175,14 @@ const Auth: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
               </div>
+              {isSignUp && (
+                <p className="text-xs text-muted-foreground">
+                  Minimum 8 characters
+                </p>
+              )}
             </div>
 
             <Button 

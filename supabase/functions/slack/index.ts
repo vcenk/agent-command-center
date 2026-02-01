@@ -223,7 +223,7 @@ serve(async (req: Request) => {
         app_id: tokenData.app_id,
         authed_user_id: tokenData.authed_user?.id,
         // Store available channels for selection
-        available_channels: channelsData.ok ? channelsData.channels?.map((c: any) => ({
+        available_channels: channelsData.ok ? channelsData.channels?.map((c: { id: string; name: string }) => ({
           id: c.id,
           name: c.name,
         })) : [],

@@ -31,6 +31,7 @@ import {
   User,
   Building2,
 } from 'lucide-react';
+import { MobileNav } from './MobileNav';
 
 interface Workspace {
   id: string;
@@ -67,9 +68,13 @@ export const TopBar: React.FC = () => {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-6">
-      {/* Workspace Switcher */}
-      <DropdownMenu>
+    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 md:px-6">
+      <div className="flex items-center gap-2">
+        {/* Mobile Navigation Drawer */}
+        <MobileNav />
+
+        {/* Workspace Switcher */}
+        <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="gap-2">
             <Building2 className="w-4 h-4 text-muted-foreground" />
@@ -92,6 +97,7 @@ export const TopBar: React.FC = () => {
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
 
       {/* Global Search */}
       <div className="flex-1 max-w-md mx-8">

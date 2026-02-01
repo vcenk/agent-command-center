@@ -1,73 +1,121 @@
-# Welcome to your Lovable project
+# Agent Command Center
 
-## Project info
+A comprehensive AI Agent management platform for building, deploying, and monitoring conversational AI agents across multiple channels.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Overview
 
-## How can I edit this code?
+Agent Command Center is a multi-tenant SaaS application that enables businesses to create and manage AI-powered conversational agents. Built with modern web technologies and a serverless architecture.
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- **Agent Management** - Create, configure, and deploy AI agents
+- **Persona System** - Define agent personalities, tones, and behaviors
+- **Knowledge Base** - Upload documents and text for RAG-powered responses
+- **Multi-Channel Support** - Web chat, phone, SMS, WhatsApp
+- **Lead Capture** - Automatic contact extraction from conversations
+- **Analytics Dashboard** - Track conversations, leads, and performance
+- **Billing Integration** - Stripe-powered subscription management
+- **Team Collaboration** - Role-based access control (Owner, Manager, Viewer)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript, Vite |
+| UI | shadcn/ui, Tailwind CSS, Radix UI |
+| State | TanStack React Query |
+| Backend | Supabase (PostgreSQL + Edge Functions) |
+| Auth | Supabase Auth |
+| Payments | Stripe |
 
-**Use your preferred IDE**
+## Quick Start
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+# Clone the repository
+git clone https://github.com/vcenk/agent-command-center.git
+cd agent-command-center
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+# Install dependencies
+npm install
 
-Follow these steps:
+# Configure environment
+cp .env.example .env
+# Edit .env with your Supabase credentials
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Scripts
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Run ESLint |
 
-**Use GitHub Codespaces**
+## Project Structure
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+AgentCenter/
+├── docs/                    # Documentation
+├── public/                  # Static assets
+├── src/
+│   ├── components/          # React components
+│   │   ├── layout/          # Layout components
+│   │   ├── shared/          # Shared business components
+│   │   └── ui/              # shadcn/ui components
+│   ├── constants/           # Application constants
+│   ├── contexts/            # React contexts
+│   ├── data/                # Templates and demo data
+│   ├── hooks/               # Custom React hooks
+│   ├── integrations/        # Third-party integrations
+│   ├── lib/                 # Utility functions
+│   ├── pages/               # Page components
+│   ├── services/            # API services
+│   └── types/               # TypeScript types
+├── supabase/
+│   ├── functions/           # Edge Functions
+│   └── migrations/          # Database migrations
+└── package.json
+```
 
-## What technologies are used for this project?
+## Documentation
 
-This project is built with:
+Comprehensive documentation is available in the `docs/` folder:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+| Document | Description |
+|----------|-------------|
+| [Getting Started](docs/GETTING_STARTED.md) | Setup and installation guide |
+| [Project Structure](docs/PROJECT_STRUCTURE.md) | Detailed file organization |
+| [Architecture](docs/ARCHITECTURE.md) | System design and patterns |
+| [Database](docs/DATABASE.md) | Schema and data model |
+| [API](docs/API.md) | Edge Functions reference |
+| [Hooks](docs/HOOKS.md) | Custom React hooks |
+| [Components](docs/COMPONENTS.md) | UI component library |
+| [Rules](docs/RULES.md) | Coding standards |
 
-## How can I deploy this project?
+## Environment Variables
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```env
+VITE_SUPABASE_PROJECT_ID=your-project-id
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
+```
 
-## Can I connect a custom domain to my Lovable project?
+## Contributing
 
-Yes, you can!
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## License
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This project is proprietary software. All rights reserved.
+
+---
+
+Built with [React](https://react.dev), [Supabase](https://supabase.com), and [shadcn/ui](https://ui.shadcn.com)

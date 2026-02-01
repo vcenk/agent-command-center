@@ -251,9 +251,15 @@ const chunkContent = (content: string, sourceId: string, chunkSize = 1000) => {
 };
 
 // Simple keyword-based retrieval
+interface ChunkWithSource {
+  content: string;
+  sourceName: string;
+  [key: string]: unknown;
+}
+
 export const retrieveChunks = (query: string, knowledgeIds: string[], topK = 3) => {
   const queryWords = query.toLowerCase().split(/\s+/);
-  const allChunks: { chunk: any; score: number }[] = [];
+  const allChunks: { chunk: ChunkWithSource; score: number }[] = [];
 
   for (const id of knowledgeIds) {
     const source = knowledgeSources.getById(id);
@@ -365,7 +371,8 @@ export const usage = {
   increment: (workspaceId: string, field: keyof Omit<Usage, 'workspaceId'>, amount = 1) => {
     const index = db.usage.findIndex(u => u.workspaceId === workspaceId);
     if (index !== -1) {
-      (db.usage[index] as any)[field] += amount;
+      const usage = db.usage[index];
+      (usage[field] as number) += amount;
       saveDb(db);
     }
   },

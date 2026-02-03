@@ -25,29 +25,50 @@ export const SlugSchema = z.string().min(1).max(100).regex(/^[a-z0-9-]+$/);
 // Agent schemas
 // ============================================
 
-export const AgentStatusSchema = z.enum(['draft', 'live', 'paused', 'archived']);
+export const AgentStatusSchema = z.enum(['draft', 'live']);
+
+export const BusinessDomainSchema = z.enum([
+  'healthcare',
+  'retail',
+  'finance',
+  'realestate',
+  'hospitality',
+  'other',
+]);
+
+export const AgentChannelsSchema = z.object({
+  webChat: z.boolean().optional(),
+  phone: z.boolean().optional(),
+  sms: z.boolean().optional(),
+  whatsapp: z.boolean().optional(),
+});
 
 export const AgentCreateSchema = z.object({
   name: NameSchema,
-  business_domain: z.string().max(100).optional(),
+  business_domain: BusinessDomainSchema.optional(),
   persona_id: UUIDSchema.nullable().optional(),
-  goals: z.array(z.string().max(500)).max(10).optional(),
-  llm_model_id: UUIDSchema.optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  max_tokens: z.number().int().min(1).max(32000).optional(),
-  system_prompt_override: z.string().max(10000).optional(),
+  goals: z.string().max(5000).optional(),
+  allowed_actions: z.array(z.string().max(500)).max(50).optional(),
+  knowledge_source_ids: z.array(UUIDSchema).optional(),
+  channels: AgentChannelsSchema.optional(),
+  status: AgentStatusSchema.optional(),
+  llm_model_id: UUIDSchema.nullable().optional(),
+  llm_temperature: z.number().min(0).max(2).optional(),
+  llm_max_tokens: z.number().int().min(1).max(32000).optional(),
 });
 
 export const AgentUpdateSchema = z.object({
   name: NameSchema.optional(),
-  business_domain: z.string().max(100).optional(),
+  business_domain: BusinessDomainSchema.optional(),
   persona_id: UUIDSchema.nullable().optional(),
-  goals: z.array(z.string().max(500)).max(10).optional(),
-  llm_model_id: UUIDSchema.optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  max_tokens: z.number().int().min(1).max(32000).optional(),
-  system_prompt_override: z.string().max(10000).optional(),
+  goals: z.string().max(5000).optional(),
+  allowed_actions: z.array(z.string().max(500)).max(50).optional(),
+  knowledge_source_ids: z.array(UUIDSchema).optional(),
+  channels: AgentChannelsSchema.optional(),
   status: AgentStatusSchema.optional(),
+  llm_model_id: UUIDSchema.nullable().optional(),
+  llm_temperature: z.number().min(0).max(2).optional(),
+  llm_max_tokens: z.number().int().min(1).max(32000).optional(),
 });
 
 // Allowed fields for agent updates (prevents mass assignment)
@@ -56,11 +77,13 @@ export const AGENT_ALLOWED_UPDATE_FIELDS = [
   'business_domain',
   'persona_id',
   'goals',
-  'llm_model_id',
-  'temperature',
-  'max_tokens',
-  'system_prompt_override',
+  'allowed_actions',
+  'knowledge_source_ids',
+  'channels',
   'status',
+  'llm_model_id',
+  'llm_temperature',
+  'llm_max_tokens',
 ] as const;
 
 // ============================================

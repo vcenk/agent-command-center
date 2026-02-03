@@ -7,6 +7,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8081,
+    proxy: {
+      '/functions/v1': {
+        target: process.env.VITE_SUPABASE_URL || 'https://ehvcrdooykxmcpcopuxz.supabase.co',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
   plugins: [react()],
   resolve: {

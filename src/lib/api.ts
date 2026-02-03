@@ -15,7 +15,11 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // Base URL for Edge Functions
-const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
+// In development, use Vite proxy (same-origin, no CORS issues)
+// In production, use the full Supabase URL
+const FUNCTIONS_URL = import.meta.env.DEV
+  ? '/functions/v1'
+  : import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Single-flight refresh lock to prevent refresh storms
@@ -108,15 +112,31 @@ async function request<T>(endpoint: string, options: ApiOptions = {}): Promise<T
 
   const url = `${FUNCTIONS_URL}${endpoint}`;
 
-  const response = await fetch(url, {
-    method,
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'apikey': SUPABASE_ANON_KEY, // Required by Supabase Functions gateway
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const requestHeaders: Record<string, string> = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Only add apikey if it exists
+  if (SUPABASE_ANON_KEY) {
+    requestHeaders['apikey'] = SUPABASE_ANON_KEY;
+  } else {
+    console.error('[API] WARNING: apikey is missing! VITE_SUPABASE_PUBLISHABLE_KEY =', import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+  }
+
+  console.debug(`[API] ${method} ${url} | apikey present: ${!!SUPABASE_ANON_KEY} | token: ${accessToken?.substring(0, 20)}...`);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: requestHeaders,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (fetchError) {
+    console.error(`[API] Network error on ${method} ${endpoint}:`, fetchError);
+    throw new ApiError(`Network error: ${fetchError instanceof Error ? fetchError.message : 'Failed to fetch'}`, 0);
+  }
 
   // Handle 401 - don't retry, let the user re-login
   if (response.status === 401) {

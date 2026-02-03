@@ -114,10 +114,13 @@ serve(async (req: Request) => {
             business_domain: validatedData.business_domain,
             persona_id: validatedData.persona_id,
             goals: validatedData.goals,
+            allowed_actions: validatedData.allowed_actions,
+            knowledge_source_ids: validatedData.knowledge_source_ids,
+            channels: validatedData.channels,
+            status: validatedData.status,
             llm_model_id: validatedData.llm_model_id,
-            temperature: validatedData.temperature,
-            max_tokens: validatedData.max_tokens,
-            system_prompt_override: validatedData.system_prompt_override,
+            llm_temperature: validatedData.llm_temperature,
+            llm_max_tokens: validatedData.llm_max_tokens,
             workspace_id: workspaceId, // CRITICAL: Force workspace_id from auth
           })
           .select()
